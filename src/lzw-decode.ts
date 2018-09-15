@@ -3,12 +3,10 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:20
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-15 21:44:57
+ * @Last Modified time: 2018-09-16 01:00:20
  */
-
  export default class LzwDecode {
-    constructor(width: number, colorDepth: number) {
-        this.width = width;
+    constructor(colorDepth: number) {
         this.defaultColorSize = Math.max(1, colorDepth);
         this.init();
     }
@@ -17,9 +15,7 @@
 
     colorSize!: number;
 
-    width: number;
-
-    dict!: Map<number, string>;
+    dict!: Map<number, number[]>;
 
     clearCode!: number;
 
@@ -33,16 +29,16 @@
         this.colorSize = this.defaultColorSize;
         this.dict = new Map();
         for (let index = 0; index < 2 ** this.colorSize; index++) {
-            this.insertSeq('' + index);
+            this.insertSeq([index]);
         }
         this.clearCode = 1 << this.colorSize;
         this.endCode = this.clearCode + 1;
         this.colorSize += 1;
-        this.insertSeq('' + this.clearCode);
-        this.insertSeq('' + this.endCode);
+        this.insertSeq([this.clearCode]);
+        this.insertSeq([this.endCode]);
     }
 
-    insertSeq(str: string) {
+    insertSeq(str: number[]) {
         const index = this.dict.size;
         if (index > ((1 << this.colorSize)) - 1) {
             this.colorSize += 1;
@@ -82,6 +78,7 @@
         this.buffers = buffers;
         let prev;
         let isDone = false;
+        let outputs: number[] = [];
         this.nextCode();
         
         while (!isDone) {
@@ -97,10 +94,11 @@
                 let output = this.getCodeSeq(code);
                 prev = output;
                 output = this.getCodeSeq(code);
-                this.insertSeq(`${prev}${output[0]}`);
-                this.data.push(code);
+                outputs.push(...prev);
+                this.insertSeq(prev.concat(output[0]));
             }
         }
-        return this.data;
+        return outputs;
     }
  }
+

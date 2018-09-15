@@ -1,11 +1,22 @@
 /*
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
- * @Last Modified by:   lijianzhang
- * @Last Modified time: 2018-09-15 21:52:17
+ * @Last Modified by: lijianzhang
+ * @Last Modified time: 2018-09-16 01:05:03
  */
+import Frame from './frame';
 import LzwEncode from  './lzw-encode';
 import LzwDecode from './lzw-decode';
+
+const CONSTANT_FALG = {
+    imageDescriptor: 0x2C,
+    extension: 0x21,
+    imageExtension: 0xF9,
+    plainTextExtension: 0x01,
+    applicationExtension: 0xFF,
+    commentExtension: 0xFE,
+    endFlag: 0x3B,
+};
 
 export default class Gif {
     constructor(data: Blob) {
@@ -23,8 +34,18 @@ export default class Gif {
         this.dataSource = new Uint8Array(this.fieldReader.result as ArrayBuffer);
         this.readHeader();
         this.readLogicalScreenDescriptor();
-        this.readGlobalColorTable();
+        if (this.globalColorTableFlag) {
+            this.readGlobalColorTable();
+        }
+
+        while (!this.loaded) {
+            this.readExtension();
+        }
+        
     }
+
+    frames: Frame[] = [];
+
 
     private offset = 0;
 
@@ -46,21 +67,37 @@ export default class Gif {
 
 
     /**
+     * 如果其为 true ，则表示存在 Global Color Table。如果为 false，则没有 Global Color Table
      *
-     * @type {({
-     *         globalColorTableFlag: 0 | 1; // 如果其为 1 ，则表示存在 Global Color Table。如果为 0，则没有 Global Color Table
-     *         colorResolution: number; // 用于表示色彩分辨率，如果为 s，则 Global Color Table 的颜色数为 2^(s+1)个，如果这是 s = 1,则一共有 4 中颜色，即每个像素可以用 2位（二进制） 来表示
-     *         sortFlag: 0 | 1; // 它有两个值 0 或 1。如果为 0 则 Global Color Table 不进行排序，为 1 则表示 Global Color Table 按照降序排列，出现频率最多的颜色排在最前面。
-     *         pixel: number; // 如其值为 s，则全局列表颜色个数的计算公式为 2^(s+1)。如 s = 1，则 Global Color Table 包含 4 个颜色
-     *     })}
+     * @type {boolean}
      * @memberof Gif
      */
-    public packedField!: {
-        globalColorTableFlag: 0 | 1; // 如果其为 1 ，则表示存在 Global Color Table。如果为 0，则没有 Global Color Table
-        colorResolution: number; // 用于表示色彩分辨率，如果为 s，则 Global Color Table 的颜色数为 2^(s+1)个，如果这是 s = 1,则一共有 4 中颜色，即每个像素可以用 2位（二进制） 来表示
-        sortFlag: 0 | 1; // 它有两个值 0 或 1。如果为 0 则 Global Color Table 不进行排序，为 1 则表示 Global Color Table 按照降序排列，出现频率最多的颜色排在最前面。
-        sizeOfGlobalColorTable: number; // 如其值为 s，则全局列表颜色个数的计算公式为 2^(s+1)。如 s = 1，则 Global Color Table 包含 4 个颜色
-    }
+    globalColorTableFlag: boolean = false;
+
+    /**
+     * 用于表示色彩分辨率，如果为 s，则 Global Color Table 的颜色数为 2^(s+1)个，如果这是 s = 1,则一共有 4 中颜色，即每个像素可以用 2位（二进制） 来表示
+     *
+     * @type {number}
+     * @memberof Gif
+     */
+    colorResolution: number = 1;
+
+    /**
+     * 如果为 false 则 Global Color Table 不进行排序，为 true 则表示 Global Color Table 按照降序排列，出现频率最多的颜色排在最前面。
+     *
+     * @type {boolean}
+     * @memberof Gif
+     */
+    sortFlag: boolean = false;
+
+    /**
+     * 如其值为 s，则全局列表颜色个数的计算公式为 2^(s+1)。如 s = 1，则 Global Color Table 包含 4 个颜色
+     *
+     * @type {number}
+     * @memberof Gif
+     */
+    sizeOfGlobalColorTable: number = 1;
+
 
     /**
      * 表示 GIF 的背景色在 Global Color Table 中的索引。
@@ -75,6 +112,8 @@ export default class Gif {
 
     colors: string[] = [];
 
+    loaded = false;
+
 
     version!: string;
 
@@ -86,8 +125,12 @@ export default class Gif {
         return this.dataSource.slice(this.offset, this.offset += 1)[0];
     }
 
-    public read1(l) {
-        const b = this.read()
+    _read(len) {
+        return this.dataSource.slice(this.offset, this.offset + len);
+    }
+
+    getDataType() {
+        return this.dataSource.slice(this.offset, this.offset + 1)[0];
     }
 
     private readHeader() {
@@ -105,31 +148,25 @@ export default class Gif {
     private readLogicalScreenDescriptor() {
         const w = this.readOne() + (this.readOne() << 8);
         const h = this.readOne() + (this.readOne() << 8);
-        console.log(w, h);
         this.width = w;
         this.height = h;
         const m = this.readOne();
-        const globalColorTableFlag = (1 & m >> 7) as 0 | 1;
+        this.globalColorTableFlag = !!(1 & m >> 7);
 
-        const colorResolution = 0b0111 & m >> 4;
+        this.sizeOfGlobalColorTable = 0b0111 & m >> 4;
 
-        const sortFlag = (1 & (m >> 3)) as 0 | 1;
+        this.sortFlag = !!(1 & (m >> 3));
 
-        const sizeOfGlobalColorTable = (0b111 & m) as 0 | 1;
+        this.colorResolution = (0b111 & m);
 
-        this.packedField = {
-            globalColorTableFlag,
-            colorResolution,
-            sortFlag,
-            sizeOfGlobalColorTable
-        }
         this.backgroundColorIndex = this.readOne();
         this.pixelAspectRatio = this.readOne();
     }
 
     private readGlobalColorTable() {
-        const len =  2 ** (this.packedField.sizeOfGlobalColorTable + 1) * 3;
-        let index = 0;
+        const len =  2 ** (this.sizeOfGlobalColorTable + 1) * 3;
+        console.log('len', len);
+        let index = 3;
         while (index <= len) {
             // TODO: 看看有没有更好的方法
             const color = this.read(3).reduce((c, b) => {
@@ -143,26 +180,115 @@ export default class Gif {
             index += 3;
         };
     }
+
+    public readExtension() {
+        switch (this.readOne()) {
+            case CONSTANT_FALG.extension: {
+                switch (this.readOne()) {
+                    case CONSTANT_FALG.imageExtension:
+                        this.readGraphicsControlExtension();
+                        break;
+                    case CONSTANT_FALG.commentExtension:
+                        this.readCommentExtension();
+                        break;
+                    case CONSTANT_FALG.applicationExtension:
+                        this.readApplicationExtension();
+                        break;
+                    case CONSTANT_FALG.plainTextExtension:
+                        this.readPlainTextExtension();
+                        break;
+                    default:
+                        break;
+                }
+                break;
+            }
+            case CONSTANT_FALG.imageDescriptor: {
+                this.readImageDescriptor();
+                break;
+            }
+            case CONSTANT_FALG.endFlag: {
+                this.loaded = true;
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    /**
+     * name
+     */
+    public readGraphicsControlExtension() {
+        this.readOne(); // 跳过
+        const m = this.readOne();
+
+
+        const methodType = 0b111 & m >> 2;
+        const useInputFlag = !!(0b1 & m >> 1);
+        const transparentColorFlag = !!(0b1 & m);
+
+        const delay = this.readOne() + (this.readOne() << 8);
+
+        const transparentColorIndex = this.readOne();
+
+        const frame = new Frame({
+            methodType,
+            useInputFlag,
+            transparentColorFlag,
+            delay,
+            transparentColorIndex
+        })
+        this.frames.push(frame);
+        this.readOne();
+        this.readImageDescriptor(frame);
+    }
+
+    public readImageDescriptor(frame?: Frame) {
+        if (!frame) {
+            frame = new Frame({ methodType: 0, useInputFlag: false, transparentColorFlag: false, delay: 0 });
+            this.frames.push(frame);
+        }
+        this.readOne() // 过滤标识
+
+        frame.x = this.readOne() + (this.readOne() << 8);
+        frame.y = this.readOne() + (this.readOne() << 8);
+        frame.w = this.readOne() + (this.readOne() << 8);
+        frame.h = this.readOne() + (this.readOne() << 8);
+
+        const m = this.readOne();
+        frame.isLocalColor = !!(0b1 & m >> 7);
+        frame.isInterlace = !!(0b1 & m >> 6);
+        frame.isSort = !!(0b1 & m >> 5);
+        frame.sizeOfLocalColors = (0b111 & m);
+
+        if (!frame.isLocalColor) {
+            frame.globalColors = this.colors;
+        }
+
+        // 解析图像数据
+
+        const colorDepth = this.readOne();
+        const len = this.readOne();
+        const data = this.read(len);
+        const lzwDecode = new LzwDecode(colorDepth);
+        frame.setImageData(lzwDecode.decode(data));
+
+    }
+
+    public readPlainTextExtension() {
+        const len = this.readOne();
+        this.read(len + 1); // 暂时不处理, 直接跳过
+    }
+
+    public readApplicationExtension() {
+        const len = this.readOne();
+        // TODO: 待完成
+        this.read(len + 1);
+    }
+
+    public readCommentExtension() {
+        const len = this.readOne();
+        this.read(len + 1); // 暂时不处理, 直接跳过
+    }
 }
-
-(window as any).LzwEncode = LzwEncode;
-
-const a = new LzwEncode(10, 10, 2);
-const b = a.encode([
-    1,1,1,1,1,2,2,2,2,2,
-    1,1,1,1,1,2,2,2,2,2,
-    1,1,1,1,1,2,2,2,2,2,
-    1,1,1,0,0,0,0,2,2,2,
-    1,1,1,0,0,0,0,2,2,2,
-    2,2,2,0,0,0,0,1,1,1,
-    2,2,2,0,0,0,0,1,1,1,
-    2,2,2,2,2,1,1,1,1,1,
-    2,2,2,2,2,1,1,1,1,1,
-    2,2,2,2,2,1,1,1,1,1,
-]);
-console.log(b);
-console.log(Array.from(b).map(v => v.toString(2)));
-(window as any).a = a;
-
-const c = new LzwDecode(10, 2);
-c.decode(b);
+(window as any).LzwDecode = LzwDecode;

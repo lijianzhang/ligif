@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-15 21:44:49
+ * @Last Modified time: 2018-09-16 00:50:45
  */
 export type Dictionary = Map<string | number, number>;
 
@@ -72,18 +72,18 @@ export default class LzwEncoder {
         while(i < str.length) {
             current = str[i];
             next = str[i + 1];
-            while (next !== undefined && this.getSeqCode(`${current},${next}`) !== undefined) {
-                current = `${current},${next}`;
+            while (next !== undefined && this.getSeqCode(`${current}${next}`) !== undefined) {
+                current = `${current}${next}`;
                 i += 1
                 next = str[i + 1];
             }
             code = this.getSeqCode(current);
             if (next !== undefined) {
-                this.insertSeq(`${current},${next}`);
+                this.insertSeq(`${current}${next}`);
             }
             this.pushCode(code);
             codes.push(code);
-            
+
             i += 1;
         }
         this.pushCode(this.endCode);
