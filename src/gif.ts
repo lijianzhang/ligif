@@ -2,10 +2,9 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-16 18:43:28
+ * @Last Modified time: 2018-09-16 20:40:54
  */
-import Frame from './frame';
-import LzwEncode from  './lzw-encode';
+import Frame, { IFrameOpiton } from './frame';
 import LzwDecode from './lzw-decode';
 
 const CONSTANT_FALG = {
@@ -30,6 +29,8 @@ export default class Gif {
 
     private dataSource!: Uint8Array;
 
+    currentOptions?: IFrameOpiton;
+
     private onLoad() {
         console.time('total');
         this.dataSource = new Uint8Array(this.fieldReader.result as ArrayBuffer);
@@ -46,20 +47,55 @@ export default class Gif {
         }
         console.timeEnd('total');
 
-        this.frames.filter(f => f.w).forEach((f) => {
+        let lastCanvas: CanvasRenderingContext2D;
+        this.frames.filter(f => f.w).forEach((f, i) => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d')!;
-    
     
             canvas.width = this.width
             canvas.height = this.height;
             document.body.appendChild(canvas);
-            const imgData = ctx.createImageData(f.w, f.h);
-            f.imgPoints.forEach((v, i) => {
-                imgData.data[i] = v;
+            // if (this.backgroundColorIndex) {
+            //     ctx.fillStyle = '#' + this.colors[this.backgroundColorIndex * 3].toString(16) + this.colors[this.backgroundColorIndex * 3 + 1].toString(16) + this.colors[this.backgroundColorIndex * 3 + 2].toString(16);
+            //     ctx.fillStyle = 'rgba(0,0,0,0)';
+            //     ctx.fillRect(0, 0, this.width, this.height);
+            // }
+
+            let imgData = ctx.createImageData(f.w, f.h);
+
+
+            f.imgPoints.forEach((k, index) => {
+                // if (!f.transparentColorFlag || f.transparentColorIndex !== k) {
+                imgData.data[index * 4] = f.colors[k * 3];
+                imgData.data[index * 4 + 1] = f.colors[k * 3 + 1];
+                imgData.data[index * 4 + 2] = f.colors[k * 3 + 2];
+                imgData.data[index * 4 + 3] = f.transparentColorFlag && k === f.transparentColorIndex ? 0 : 255;
+
+                // } else {
+                //     imgData.data[index * 4] = 0;
+                //     imgData.data[index * 4 + 1] = 0;
+                //     imgData.data[index * 4 + 2] = 0;
+                //     imgData.data[index * 4 + 3] = 0;
+                // }
             });
-            ctx.clearRect(0, 0, f.w, f.h);
+
             ctx.putImageData(imgData, f.x, f.y, 0, 0, f.w, f.h);
+
+            if (f.methodType === 1 && lastCanvas) {
+                imgData = ctx.getImageData(0, 0, this.width, this.height);
+                const lastImageData = lastCanvas.getImageData(0, 0, this.width, this.height);
+                for (var i = 0; i < imgData.data.length; i+=4) {
+                    if (imgData.data[i+3] == 0) {
+                        imgData.data[i] = lastImageData.data[i];
+                        imgData.data[i+1] = lastImageData.data[i+1];
+                        imgData.data[i+2] = lastImageData.data[i+2];
+                        imgData.data[i+3] = lastImageData.data[i+3];
+                    }
+                }
+                ctx.putImageData(imgData, 0, 0);
+            }
+            lastCanvas = ctx;
+
         });
         
     }
@@ -244,34 +280,31 @@ export default class Gif {
 
 
         const methodType = 0b111 & m >> 2;
-        const useInputFlag = !!(0b1 & m >> 1);
-        const transparentColorFlag = !!(0b1 & m);
-        // console.log(this.getDataType());
+        const useInput = !!(0b1 & m >> 1);
+        const transparentColorFlag = !!(m & 0b1);
+        console.log(transparentColorFlag);
         const delay = this.readOne() + (this.readOne() << 8);
         // console.log('delay', delay, this.getDataType());
 
         const transparentColorIndex = this.readOne();
 
-        const frame = new Frame({
+        this.currentOptions = {
             methodType,
-            useInputFlag,
+            useInput,
             transparentColorFlag,
             delay,
             transparentColorIndex
-        })
-        this.frames.push(frame);
+        };
         this.readOne();
-        if (this.getDataType() === CONSTANT_FALG.imageDescriptor) {
-            this.readOne();
-            this.readImageDescriptor(frame);
-        }
     }
 
-    public readImageDescriptor(frame?: Frame) {
-        if (!frame) {
-            frame = new Frame({ methodType: 0, useInputFlag: false, transparentColorFlag: false, delay: 0 });
-            this.frames.push(frame);
-        }
+    public readImageDescriptor() {
+        const option = this.currentOptions || { methodType: 0, useInput: false, transparentColorFlag: false, delay: 0 };
+
+        const frame = new Frame(option);
+        this.frames.push(frame);
+        this.currentOptions = undefined;
+
 
         frame.x = this.readOne() + (this.readOne() << 8);
         frame.y = this.readOne() + (this.readOne() << 8);

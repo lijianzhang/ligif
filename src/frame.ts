@@ -2,20 +2,20 @@
  * @Author: lijianzhang
  * @Date: 2018-09-16 00:10:40
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-16 18:59:42
+ * @Last Modified time: 2018-09-16 20:38:02
  */
-interface IOpiton {
+export interface IFrameOpiton {
     methodType: number;
-    useInputFlag: boolean;
+    useInput: boolean;
     transparentColorIndex?: number;
     delay: number;
     transparentColorFlag: boolean;
 }
 
 export default class Frame {
-    constructor(option: IOpiton) {
+    constructor(option: IFrameOpiton) {
         this.methodType = option.methodType;
-        this.useInputFlag = option.useInputFlag;
+        this.useInput = option.useInput;
         this.delay = option.delay;
         this.transparentColorIndex = option.transparentColorIndex || 0;
         this.transparentColorFlag = option.transparentColorFlag;
@@ -38,7 +38,7 @@ export default class Frame {
 
     methodType: number;
 
-    useInputFlag: boolean;
+    useInput: boolean;
 
     transparentColorIndex: number;
 
@@ -46,26 +46,16 @@ export default class Frame {
 
     transparentColorFlag: boolean;
 
-    imgPoints: number[] = []
+    imgPoints: number[] = [];
+
     
     setImageData(data: number[]) {
-        const colors = this.colors;
-        data.forEach((index) => {
-            this.imgPoints.push(colors[index * 3]);
-            this.imgPoints.push(colors[index * 3 + 1]);
-            this.imgPoints.push(colors[index * 3 + 2]);
-            this.imgPoints.push(this.transparentColorFlag && index === this.transparentColorIndex ? 0 : 255);
-        });
-        // let i = 0;
-
-        // let points: number[][][] = [];
-        // for (let x = 0; x < this.w; x++) {
-        //     points[x] = [];
-        //     for (let y = 0; y < this.h; y++) {
-        //         points[x][y] =  [colors[data[i] * 3], colors[data[i] * 3 + 1], colors[data[i] * 3 + 2]];
-        //         i += 1;
-        //     }
-        // }
-        // console.log(points);
+        this.imgPoints = data;
+        // data.forEach((index) => {
+        //     this.imgPoints.push(colors[index * 3]);
+        //     this.imgPoints.push(colors[index * 3 + 1]);
+        //     this.imgPoints.push(colors[index * 3 + 2]);
+        //     this.imgPoints.push(this.transparentColorFlag && index === this.transparentColorIndex ? 0 : 255);
+        // });
     }
 }
