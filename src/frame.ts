@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-16 00:10:40
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-16 01:05:18
+ * @Last Modified time: 2018-09-16 18:59:42
  */
 interface IOpiton {
     methodType: number;
@@ -17,7 +17,7 @@ export default class Frame {
         this.methodType = option.methodType;
         this.useInputFlag = option.useInputFlag;
         this.delay = option.delay;
-        this.transparentColorIndex = option.transparentColorIndex;
+        this.transparentColorIndex = option.transparentColorIndex || 0;
         this.transparentColorFlag = option.transparentColorFlag;
     }
 
@@ -34,33 +34,38 @@ export default class Frame {
 
     sizeOfLocalColors = 0;
 
-    globalColors?: string[];
-
-    colors: string[] = [];
+    colors: number[] = [];
 
     methodType: number;
 
     useInputFlag: boolean;
 
-    transparentColorIndex?: number;
+    transparentColorIndex: number;
 
     delay: number;
 
     transparentColorFlag: boolean;
 
-    imgPoints: string[][] = []
+    imgPoints: number[] = []
     
     setImageData(data: number[]) {
-        const colors = this.globalColors || this.colors;
+        const colors = this.colors;
+        data.forEach((index) => {
+            this.imgPoints.push(colors[index * 3]);
+            this.imgPoints.push(colors[index * 3 + 1]);
+            this.imgPoints.push(colors[index * 3 + 2]);
+            this.imgPoints.push(this.transparentColorFlag && index === this.transparentColorIndex ? 0 : 255);
+        });
+        // let i = 0;
 
-        let i = 0;
-
-        for (let x = 0; x < this.w; x++) {
-            this.imgPoints[x] = [];
-            for (let y = 0; y < this.h; y++) {
-                this.imgPoints[x][y] =  colors[data[i]];
-                i += 1;
-            }
-        }
+        // let points: number[][][] = [];
+        // for (let x = 0; x < this.w; x++) {
+        //     points[x] = [];
+        //     for (let y = 0; y < this.h; y++) {
+        //         points[x][y] =  [colors[data[i] * 3], colors[data[i] * 3 + 1], colors[data[i] * 3 + 2]];
+        //         i += 1;
+        //     }
+        // }
+        // console.log(points);
     }
 }

@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-16 01:05:03
+ * @Last Modified time: 2018-09-16 18:43:28
  */
 import Frame from './frame';
 import LzwEncode from  './lzw-encode';
@@ -31,16 +31,36 @@ export default class Gif {
     private dataSource!: Uint8Array;
 
     private onLoad() {
+        console.time('total');
         this.dataSource = new Uint8Array(this.fieldReader.result as ArrayBuffer);
         this.readHeader();
         this.readLogicalScreenDescriptor();
+
         if (this.globalColorTableFlag) {
-            this.readGlobalColorTable();
+            const len =  2 ** (this.sizeOfGlobalColorTable + 1) * 3;
+            this.colors = this.readColorTable(len);
         }
 
         while (!this.loaded) {
             this.readExtension();
         }
+        console.timeEnd('total');
+
+        this.frames.filter(f => f.w).forEach((f) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d')!;
+    
+    
+            canvas.width = this.width
+            canvas.height = this.height;
+            document.body.appendChild(canvas);
+            const imgData = ctx.createImageData(f.w, f.h);
+            f.imgPoints.forEach((v, i) => {
+                imgData.data[i] = v;
+            });
+            ctx.clearRect(0, 0, f.w, f.h);
+            ctx.putImageData(imgData, f.x, f.y, 0, 0, f.w, f.h);
+        });
         
     }
 
@@ -110,7 +130,7 @@ export default class Gif {
     // 表示 GIF 的背景色在 Global Color Table 中的索引。
     pixelAspectRatio!: number;
 
-    colors: string[] = [];
+    colors: number[] = [];
 
     loaded = false;
 
@@ -153,32 +173,28 @@ export default class Gif {
         const m = this.readOne();
         this.globalColorTableFlag = !!(1 & m >> 7);
 
-        this.sizeOfGlobalColorTable = 0b0111 & m >> 4;
+        this.sizeOfGlobalColorTable = 0b0111 & m;
 
         this.sortFlag = !!(1 & (m >> 3));
 
-        this.colorResolution = (0b111 & m);
+        this.colorResolution = (0b111 & m >> 4);
 
         this.backgroundColorIndex = this.readOne();
         this.pixelAspectRatio = this.readOne();
     }
 
-    private readGlobalColorTable() {
-        const len =  2 ** (this.sizeOfGlobalColorTable + 1) * 3;
-        console.log('len', len);
+    private readColorTable(len: number) {
+        const colors: number[] = [];
         let index = 3;
         while (index <= len) {
             // TODO: 看看有没有更好的方法
-            const color = this.read(3).reduce((c, b) => {
-                const code = b.toString(16);
-                if (code.length === 1) {
-                    return c + '0' + code;
-                }
-                return c + code;
-            }, '');
-            this.colors.push(color);
+            let rpg = this.read(3);
+            colors.push(rpg[0]);
+            colors.push(rpg[1]);
+            colors.push(rpg[2]);
             index += 3;
         };
+        return colors;
     }
 
     public readExtension() {
@@ -210,7 +226,11 @@ export default class Gif {
                 this.loaded = true;
                 break;
             }
+            case 0:
+                break;
             default:
+                console.log(this.getDataType());
+                throw new Error('错误的格式');
                 break;
         }
     }
@@ -226,8 +246,9 @@ export default class Gif {
         const methodType = 0b111 & m >> 2;
         const useInputFlag = !!(0b1 & m >> 1);
         const transparentColorFlag = !!(0b1 & m);
-
+        // console.log(this.getDataType());
         const delay = this.readOne() + (this.readOne() << 8);
+        // console.log('delay', delay, this.getDataType());
 
         const transparentColorIndex = this.readOne();
 
@@ -240,7 +261,10 @@ export default class Gif {
         })
         this.frames.push(frame);
         this.readOne();
-        this.readImageDescriptor(frame);
+        if (this.getDataType() === CONSTANT_FALG.imageDescriptor) {
+            this.readOne();
+            this.readImageDescriptor(frame);
+        }
     }
 
     public readImageDescriptor(frame?: Frame) {
@@ -248,7 +272,6 @@ export default class Gif {
             frame = new Frame({ methodType: 0, useInputFlag: false, transparentColorFlag: false, delay: 0 });
             this.frames.push(frame);
         }
-        this.readOne() // 过滤标识
 
         frame.x = this.readOne() + (this.readOne() << 8);
         frame.y = this.readOne() + (this.readOne() << 8);
@@ -262,28 +285,42 @@ export default class Gif {
         frame.sizeOfLocalColors = (0b111 & m);
 
         if (!frame.isLocalColor) {
-            frame.globalColors = this.colors;
+            frame.colors = this.colors;
+        } else {
+            const len = frame.sizeOfLocalColors;
+            frame.colors = this.readColorTable(len);
         }
 
         // 解析图像数据
 
         const colorDepth = this.readOne();
-        const len = this.readOne();
-        const data = this.read(len);
-        const lzwDecode = new LzwDecode(colorDepth);
-        frame.setImageData(lzwDecode.decode(data));
+        let data: number[] = []
+        while (true) {
+            let len = this.readOne();
+            if (len) {
+                this.read(len).forEach(v => data.push(v));
+            } else {
+                const lzwDecode = new LzwDecode(colorDepth);
+                frame.setImageData(lzwDecode.decode(new Uint8Array(data)));
+                break;
+            }
+        }
+
 
     }
 
     public readPlainTextExtension() {
         const len = this.readOne();
-        this.read(len + 1); // 暂时不处理, 直接跳过
+        this.read(len); // 暂时不处理, 直接跳过
     }
 
     public readApplicationExtension() {
         const len = this.readOne();
         // TODO: 待完成
-        this.read(len + 1);
+        this.read(len);
+        while (this.getDataType()) {
+            this.readOne();
+        }
     }
 
     public readCommentExtension() {
@@ -292,3 +329,9 @@ export default class Gif {
     }
 }
 (window as any).LzwDecode = LzwDecode;
+
+const canvas = document.createElement('canvas');
+document.body.appendChild(canvas);
+canvas.width = 10;
+canvas.height = 10;
+(window as any).ctx = canvas.getContext('2d');
