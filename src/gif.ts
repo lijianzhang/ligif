@@ -2,10 +2,9 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-16 20:40:54
+ * @Last Modified time: 2018-09-17 01:26:34
  */
 import Frame, { IFrameOpiton } from './frame';
-import LzwDecode from './lzw-decode';
 
 const CONSTANT_FALG = {
     imageDescriptor: 0x2C,
@@ -18,21 +17,33 @@ const CONSTANT_FALG = {
 };
 
 export default class Gif {
-    constructor(data: Blob) {
-        this.fieldReader = new FileReader();
-        this.fieldReader.readAsArrayBuffer(data);
-        this.fieldReader.onload = this.onLoad.bind(this);
+    constructor(data?: Blob) {
+        if (data) {
+            this.fieldReader = new FileReader();
+            this.fieldReader.readAsArrayBuffer(data);
+            this.fieldReader.onload = this.onLoad.bind(this);
+        }
         (window as any).gif = this;
     }
 
-    private fieldReader: FileReader;
+    async readData(data: Blob) {
+        this.fieldReader = new FileReader();
+        this.fieldReader.readAsArrayBuffer(data);
+        return new Promise(res => {
+            this.fieldReader.onload = () => {
+                this.onLoad();
+                res(this);
+            }
+        }) as Promise<this>;
+    }
+
+    private fieldReader!: FileReader;
 
     private dataSource!: Uint8Array;
 
     currentOptions?: IFrameOpiton;
 
     private onLoad() {
-        console.time('total');
         this.dataSource = new Uint8Array(this.fieldReader.result as ArrayBuffer);
         this.readHeader();
         this.readLogicalScreenDescriptor();
@@ -45,60 +56,10 @@ export default class Gif {
         while (!this.loaded) {
             this.readExtension();
         }
-        console.timeEnd('total');
-
-        let lastCanvas: CanvasRenderingContext2D;
-        this.frames.filter(f => f.w).forEach((f, i) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d')!;
-    
-            canvas.width = this.width
-            canvas.height = this.height;
-            document.body.appendChild(canvas);
-            // if (this.backgroundColorIndex) {
-            //     ctx.fillStyle = '#' + this.colors[this.backgroundColorIndex * 3].toString(16) + this.colors[this.backgroundColorIndex * 3 + 1].toString(16) + this.colors[this.backgroundColorIndex * 3 + 2].toString(16);
-            //     ctx.fillStyle = 'rgba(0,0,0,0)';
-            //     ctx.fillRect(0, 0, this.width, this.height);
-            // }
-
-            let imgData = ctx.createImageData(f.w, f.h);
-
-
-            f.imgPoints.forEach((k, index) => {
-                // if (!f.transparentColorFlag || f.transparentColorIndex !== k) {
-                imgData.data[index * 4] = f.colors[k * 3];
-                imgData.data[index * 4 + 1] = f.colors[k * 3 + 1];
-                imgData.data[index * 4 + 2] = f.colors[k * 3 + 2];
-                imgData.data[index * 4 + 3] = f.transparentColorFlag && k === f.transparentColorIndex ? 0 : 255;
-
-                // } else {
-                //     imgData.data[index * 4] = 0;
-                //     imgData.data[index * 4 + 1] = 0;
-                //     imgData.data[index * 4 + 2] = 0;
-                //     imgData.data[index * 4 + 3] = 0;
-                // }
-            });
-
-            ctx.putImageData(imgData, f.x, f.y, 0, 0, f.w, f.h);
-
-            if (f.methodType === 1 && lastCanvas) {
-                imgData = ctx.getImageData(0, 0, this.width, this.height);
-                const lastImageData = lastCanvas.getImageData(0, 0, this.width, this.height);
-                for (var i = 0; i < imgData.data.length; i+=4) {
-                    if (imgData.data[i+3] == 0) {
-                        imgData.data[i] = lastImageData.data[i];
-                        imgData.data[i+1] = lastImageData.data[i+1];
-                        imgData.data[i+2] = lastImageData.data[i+2];
-                        imgData.data[i+3] = lastImageData.data[i+3];
-                    }
-                }
-                ctx.putImageData(imgData, 0, 0);
-            }
-            lastCanvas = ctx;
-
-        });
-        
+        if (this.next) this.next(this);
     }
+
+    next?(gif: this);
 
     frames: Frame[] = [];
 
@@ -120,6 +81,8 @@ export default class Gif {
      * @memberof Gif
      */
     public height!: number;
+
+    appVersion?: string;
 
 
     /**
@@ -169,6 +132,14 @@ export default class Gif {
     colors: number[] = [];
 
     loaded = false;
+
+    /**
+     *循环播放次数
+     *
+     * @type {number}
+     * @memberof Gif
+     */
+    times?: number;
 
 
     version!: string;
@@ -223,7 +194,7 @@ export default class Gif {
         const colors: number[] = [];
         let index = 3;
         while (index <= len) {
-            // TODO: 看看有没有更好的方法
+            // TODO: 看看有没有更好的写法
             let rpg = this.read(3);
             colors.push(rpg[0]);
             colors.push(rpg[1]);
@@ -265,7 +236,6 @@ export default class Gif {
             case 0:
                 break;
             default:
-                console.log(this.getDataType());
                 throw new Error('错误的格式');
                 break;
         }
@@ -279,29 +249,27 @@ export default class Gif {
         const m = this.readOne();
 
 
-        const methodType = 0b111 & m >> 2;
+        const displayType = 0b111 & m >> 2;
         const useInput = !!(0b1 & m >> 1);
         const transparentColorFlag = !!(m & 0b1);
-        console.log(transparentColorFlag);
         const delay = this.readOne() + (this.readOne() << 8);
-        // console.log('delay', delay, this.getDataType());
 
         const transparentColorIndex = this.readOne();
 
         this.currentOptions = {
-            methodType,
+            displayType,
             useInput,
-            transparentColorFlag,
             delay,
-            transparentColorIndex
+            transparentColorIndex: transparentColorFlag ? transparentColorIndex : undefined
         };
         this.readOne();
     }
 
     public readImageDescriptor() {
-        const option = this.currentOptions || { methodType: 0, useInput: false, transparentColorFlag: false, delay: 0 };
+        const option = this.currentOptions || {};
 
         const frame = new Frame(option);
+        frame.prevFrame = this.frames[this.frames.length - 1];
         this.frames.push(frame);
         this.currentOptions = undefined;
 
@@ -312,29 +280,28 @@ export default class Gif {
         frame.h = this.readOne() + (this.readOne() << 8);
 
         const m = this.readOne();
-        frame.isLocalColor = !!(0b1 & m >> 7);
+        const isLocalColor = !!(0b1 & m >> 7);
         frame.isInterlace = !!(0b1 & m >> 6);
-        frame.isSort = !!(0b1 & m >> 5);
-        frame.sizeOfLocalColors = (0b111 & m);
+        frame.sort = !!(0b1 & m >> 5);
+        const colorSize = (0b111 & m);
 
-        if (!frame.isLocalColor) {
-            frame.colors = this.colors;
+        if (isLocalColor) {
+            const len = colorSize;
+            frame.palette = this.readColorTable(len);
         } else {
-            const len = frame.sizeOfLocalColors;
-            frame.colors = this.readColorTable(len);
+            frame.palette = this.colors;
         }
 
         // 解析图像数据
 
-        const colorDepth = this.readOne();
+        frame.colorDepth = this.readOne();
         let data: number[] = []
         while (true) {
             let len = this.readOne();
             if (len) {
                 this.read(len).forEach(v => data.push(v));
             } else {
-                const lzwDecode = new LzwDecode(colorDepth);
-                frame.setImageData(lzwDecode.decode(new Uint8Array(data)));
+                frame.bytes = data.slice();
                 break;
             }
         }
@@ -344,13 +311,19 @@ export default class Gif {
 
     public readPlainTextExtension() {
         const len = this.readOne();
-        this.read(len); // 暂时不处理, 直接跳过
+        this.read(len); // TODO: 暂时不处理, 直接跳过
     }
 
+    
     public readApplicationExtension() {
-        const len = this.readOne();
-        // TODO: 待完成
-        this.read(len);
+        let len = this.readOne();
+        if (len !== 11) throw new Error('解析失败: application extension is invalid data');
+
+        const arr = this.read(len);
+        this.appVersion = arr.reduce((s, c) => s + String.fromCharCode(c), '');
+        this.readOne();
+        this.readOne();
+        this.times = this.readOne();
         while (this.getDataType()) {
             this.readOne();
         }
@@ -358,13 +331,6 @@ export default class Gif {
 
     public readCommentExtension() {
         const len = this.readOne();
-        this.read(len + 1); // 暂时不处理, 直接跳过
+        this.read(len + 1); // TODO: 暂时不处理, 直接跳过
     }
 }
-(window as any).LzwDecode = LzwDecode;
-
-const canvas = document.createElement('canvas');
-document.body.appendChild(canvas);
-canvas.width = 10;
-canvas.height = 10;
-(window as any).ctx = canvas.getContext('2d');

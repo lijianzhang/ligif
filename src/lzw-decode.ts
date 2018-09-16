@@ -3,7 +3,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:20
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-16 19:00:42
+ * @Last Modified time: 2018-09-17 00:55:15
  */
  export default class LzwDecode {
     constructor(colorDepth: number) {
@@ -77,14 +77,7 @@
         return code;
     }
 
-    log() {
-        this.codes.forEach((code, index) => {
-            console.log('index:', index, 'code:', code);
-        });
-    }
-
     decode(buffers: Uint8Array) {
-        console.time('decode');
         this.buffers = buffers;
         const outputs: number[] = [];
         let code: number = this.clearCode;
@@ -120,7 +113,6 @@
                 this.colorSize += 1;
             }
         }
-        console.timeEnd('decode');
         return outputs;
     }
  }
