@@ -2,20 +2,19 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-17 01:26:34
+ * @Last Modified time: 2018-09-17 15:42:40
  */
 import Frame, { IFrameOpiton } from './frame';
 
 const CONSTANT_FALG = {
-    imageDescriptor: 0x2C,
-    extension: 0x21,
-    imageExtension: 0xF9,
-    plainTextExtension: 0x01,
-    applicationExtension: 0xFF,
-    commentExtension: 0xFE,
-    endFlag: 0x3B,
+    imageDescriptor: 0x2C, //44
+    extension: 0x21, // 33
+    imageExtension: 0xF9, // 249
+    plainTextExtension: 0x01, // 1
+    applicationExtension: 0xFF, // 255
+    commentExtension: 0xFE, // 254
+    endFlag: 0x3B, // 59
 };
-
 export default class Gif {
     constructor(data?: Blob) {
         if (data) {
@@ -41,7 +40,7 @@ export default class Gif {
 
     private dataSource!: Uint8Array;
 
-    currentOptions?: IFrameOpiton;
+    private currentOptions?: IFrameOpiton;
 
     private onLoad() {
         this.dataSource = new Uint8Array(this.fieldReader.result as ArrayBuffer);
@@ -50,7 +49,7 @@ export default class Gif {
 
         if (this.globalColorTableFlag) {
             const len =  2 ** (this.sizeOfGlobalColorTable + 1) * 3;
-            this.colors = this.readColorTable(len);
+            this.palette = this.readColorTable(len);
         }
 
         while (!this.loaded) {
@@ -129,9 +128,11 @@ export default class Gif {
     // 表示 GIF 的背景色在 Global Color Table 中的索引。
     pixelAspectRatio!: number;
 
-    colors: number[] = [];
+    palette: number[] = [];
 
     loaded = false;
+
+    commit?: string;
 
     /**
      *循环播放次数
@@ -144,19 +145,15 @@ export default class Gif {
 
     version!: string;
 
-    read(len = 1) {
+    private read(len = 1) {
         return this.dataSource.slice(this.offset, this.offset += len);
     }
 
-    readOne() {
+    private readOne() {
         return this.dataSource.slice(this.offset, this.offset += 1)[0];
     }
 
-    _read(len) {
-        return this.dataSource.slice(this.offset, this.offset + len);
-    }
-
-    getDataType() {
+    private getDataType() {
         return this.dataSource.slice(this.offset, this.offset + 1)[0];
     }
 
@@ -191,20 +188,20 @@ export default class Gif {
     }
 
     private readColorTable(len: number) {
-        const colors: number[] = [];
+        const palette: number[] = [];
         let index = 3;
         while (index <= len) {
             // TODO: 看看有没有更好的写法
             let rpg = this.read(3);
-            colors.push(rpg[0]);
-            colors.push(rpg[1]);
-            colors.push(rpg[2]);
+            palette.push(rpg[0]);
+            palette.push(rpg[1]);
+            palette.push(rpg[2]);
             index += 3;
         };
-        return colors;
+        return palette;
     }
 
-    public readExtension() {
+    private readExtension() {
         switch (this.readOne()) {
             case CONSTANT_FALG.extension: {
                 switch (this.readOne()) {
@@ -244,7 +241,8 @@ export default class Gif {
     /**
      * name
      */
-    public readGraphicsControlExtension() {
+    private readGraphicsControlExtension() {
+        
         this.readOne(); // 跳过
         const m = this.readOne();
 
@@ -265,7 +263,8 @@ export default class Gif {
         this.readOne();
     }
 
-    public readImageDescriptor() {
+    private readImageDescriptor() {
+        
         const option = this.currentOptions || {};
 
         const frame = new Frame(option);
@@ -282,14 +281,17 @@ export default class Gif {
         const m = this.readOne();
         const isLocalColor = !!(0b1 & m >> 7);
         frame.isInterlace = !!(0b1 & m >> 6);
+        if (isLocalColor) {
+            debugger;
+        }
         frame.sort = !!(0b1 & m >> 5);
         const colorSize = (0b111 & m);
 
         if (isLocalColor) {
-            const len = colorSize;
+            const len =  2 ** (colorSize + 1) * 3;
             frame.palette = this.readColorTable(len);
         } else {
-            frame.palette = this.colors;
+            frame.palette = this.palette;
         }
 
         // 解析图像数据
@@ -309,28 +311,33 @@ export default class Gif {
 
     }
 
-    public readPlainTextExtension() {
+    private readPlainTextExtension() {
+        
         const len = this.readOne();
         this.read(len); // TODO: 暂时不处理, 直接跳过
     }
 
     
-    public readApplicationExtension() {
+    private readApplicationExtension() {
+        
         let len = this.readOne();
         if (len !== 11) throw new Error('解析失败: application extension is invalid data');
 
         const arr = this.read(len);
         this.appVersion = arr.reduce((s, c) => s + String.fromCharCode(c), '');
-        this.readOne();
+        const le = this.readOne();
         this.readOne();
         this.times = this.readOne();
+        
         while (this.getDataType()) {
             this.readOne();
         }
     }
 
-    public readCommentExtension() {
+    private readCommentExtension() {
+        
         const len = this.readOne();
-        this.read(len + 1); // TODO: 暂时不处理, 直接跳过
+        const arr = this.read(len + 1); // TODO: 暂时不处理, 直接跳过
+        this.commit = arr.reduce((s, c) => s + String.fromCharCode(c), '');
     }
 }
