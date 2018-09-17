@@ -5,6 +5,7 @@
  * @Last Modified time: 2018-09-17 18:28:33
  */
 import Frame, { IFrameOpiton } from './frame';
+import LzwDecode from './lzw-decode';
 
 const CONSTANT_FALG = {
     imageDescriptor: 0x2C, //44
@@ -52,7 +53,7 @@ export default class Gif {
         this.readLogicalScreenDescriptor();
 
         if (this.globalColorTableFlag) {
-            const len =  2 ** (this.sizeOfGlobalColorTable + 1) * 3;
+            const len =  2 ** (this.colorDepth + 1) * 3;
             this.palette = this.readColorTable(len);
         }
 
@@ -118,7 +119,7 @@ export default class Gif {
      * @type {number}
      * @memberof Gif
      */
-    sizeOfGlobalColorTable: number = 1;
+    colorDepth: number = 7;
 
 
     /**
@@ -181,7 +182,7 @@ export default class Gif {
         const m = this.readOne();
         this.globalColorTableFlag = !!(1 & m >> 7);
 
-        this.sizeOfGlobalColorTable = 0b0111 & m;
+        this.colorDepth = 0b0111 & m;
 
         this.sortFlag = !!(1 & (m >> 3));
 
@@ -295,21 +296,52 @@ export default class Gif {
             frame.palette = this.palette;
         }
 
+        const colorDepth = this.readOne() || this.colorDepth;
         // 解析图像数据
-
-        frame.colorDepth = this.readOne();
         let data: number[] = []
         while (true) {
             let len = this.readOne();
             if (len) {
                 this.read(len).forEach(v => data.push(v));
             } else {
-                frame.bytes = data.slice();
+                console.log('colorSize', colorSize, 'colorDepth', colorDepth);
+                this.decodeToPixels(frame, data, colorDepth);
                 break;
             }
         }
 
 
+    }
+
+    decodeToPixels(frame: Frame, data: number[], colorDepth: number) {
+        const decoder = new LzwDecode(colorDepth);
+        frame.pixels = [];
+        data = decoder.decode(new Uint8Array(data));
+        if (!frame.isInterlace) {
+            data.forEach((k) => {
+                frame.pixels.push(this.palette[k * 3]);
+                frame.pixels.push(this.palette[k * 3 + 1]);
+                frame.pixels.push(this.palette[k * 3 + 2]);
+                frame.pixels.push(k === frame.transparentColorIndex ? 0 : 255);
+            });
+        } else {
+            let start = [0, 4, 2, 1];
+            let inc = [8, 8, 4, 2];
+            let index = 0;
+            for (let pass = 0; pass < 4; pass++) {
+                for (let i = start[pass]; i < frame.h; i += inc[pass]) {
+                    for (let j = 0; j < frame.w; j++) {
+                        const idx = (i - 1) * frame.w * 4 + j * 4;
+                        const k = data[index];
+                        frame.pixels[idx] = this.palette[k * 3];
+                        frame.pixels[idx + 1] = this.palette[k * 3 + 1];
+                        frame.pixels[idx + 2] = this.palette[k * 3 + 2];
+                        frame.pixels[idx + 3] = k === frame.transparentColorIndex ? 0 : 255;
+                        index += 1;
+                    }
+                }
+            }
+        }
     }
 
     private readPlainTextExtension() {

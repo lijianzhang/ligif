@@ -48,7 +48,7 @@ export default class GIFEncoder {
 
     colorDepth: number = 7;
 
-    generatePalette(frames: Frame[], samplefac: number = 10, colorDepth = 7) {
+    generatePalette(frames: Frame[], samplefac: number = 10, colorDepth: number = 7) {
         this.colorDepth = colorDepth;
         const pixels = frames.reduce(
             (arr, frame) => arr.concat(this.getFramePixels(frame)),
@@ -76,7 +76,7 @@ export default class GIFEncoder {
                 srcPos++;
             }
         }
-        console.log(pixels);
+
         return pixels;
     }
 
@@ -140,7 +140,7 @@ export default class GIFEncoder {
             this.addCode(frame.transparentColorIndex || 0);
             this.addCode(0);
 
-            // 2. mage Descriptor
+            // 2. image Descriptor
             this.addCode(0x2c);
             this.addCodes(this.numberToBytes(frame.x));
             this.addCodes(this.numberToBytes(frame.y));
@@ -153,7 +153,7 @@ export default class GIFEncoder {
             this.addCode(m);
 
             // Image Data
-            this.addCode(2);
+            this.addCode(this.colorDepth);
 
             const indexs: number[] = [];
             for (let i = 0; i < frame.pixels.length; i += 4) {
@@ -165,11 +165,11 @@ export default class GIFEncoder {
 
             const encoder = new LzwEncoder(frame.w, frame.h, this.colorDepth);
             const codes = Array.from(encoder.encode(indexs));
-            console.log(codes);
             let len = codes.length;
+
             while (len > 0) {
-                this.addCode(Math.min(len, 255));
-                this.addCodes(codes.splice(0, 255));
+                this.addCode(Math.min(len, 0xFF));
+                this.addCodes(codes.splice(0, 0xFF));
                 len -= 255;
             }
             this.addCode(0);

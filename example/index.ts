@@ -1,5 +1,7 @@
 import Gif from '../src/gif';
 import GIFEncoder from '../src/gif-encoder';
+import Frame from '../src/frame';
+import LzwDecode from '../src/lzw-decode';
 
 (window as any).Gif =Gif;
 (window as any).GIFEncoder =GIFEncoder;
@@ -12,13 +14,14 @@ document.getElementById('main').addEventListener('drop', function (e) {
     const gif = new Gif();
     gif.readData(field).then(gif => {
         gif.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+        (window as any).gif = gif;
         const gIFEncoder = new GIFEncoder();
         gIFEncoder.frames = gif.frames;
-        gIFEncoder.generate(1, 2);
+        gIFEncoder.generate(1);
         const b = new Gif();
+        (window as any).b = b;
         b.readCodes(gIFEncoder.codes);
         b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
-        (window as any).gIFEncoder = gIFEncoder;
 
     });
 });
@@ -26,6 +29,30 @@ document.getElementById('main').addEventListener('dragover', function(e) {
     e.stopPropagation();
     e.preventDefault();
 });
+
+// setTimeout(() => {
+//     const img = document.getElementById('img') as HTMLImageElement;
+//     const canvas = document.createElement('canvas');
+//     const ctx = canvas.getContext('2d');
+//     canvas.width = img.width;
+//     canvas.height = img.height;
+
+//     ctx.drawImage(img, 0, 0);
+//     // canvas.toBlob((res) => {
+//     const frame = new Frame();
+//     frame.colorDepth = 8;
+//     frame.pixels = Array.from(ctx.getImageData(0, 0, canvas.width, canvas.height).data);
+//     frame.w = canvas.width;
+//     frame.h = canvas.height;
+//     const encoder = new GIFEncoder();
+//     encoder.addFrame(frame);
+//     encoder.generate(1, 8);
+//     const decoder = new Gif();
+//     decoder.readCodes(encoder.codes);
+//     decoder.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+//     window.decoder = decoder;
+//     }, 'image/jpge')
+// }, 1000);
 
 // setTimeout(() => {
 //     const canvas = document.createElement('canvas');

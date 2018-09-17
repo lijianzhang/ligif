@@ -57,9 +57,13 @@
         let code = 0;
         let diff = 0;
 
+        // if (this.codes.length === 129) debugger;
+
         while (colorSize > 0) {
             const buffer = this.buffers[this.index];
-            if (buffer === undefined) throw new Error('图片缺失数据');
+            if (buffer === undefined) {
+                throw new Error('图片缺失数据')
+            };
             const size = Math.min(colorSize, this.remainingBits);
             code = ((buffer >> (8 - this.remainingBits) & (1 << size) - 1) << (diff)) | code;
             colorSize -= this.remainingBits;
@@ -96,14 +100,16 @@
                     this.insertSeq(this.getCodeSeq(prevCode).concat(this.getCodeSeq(code)[0]));
                 }
             } else {
-                if (code !== this.dict.size) throw new Error('无效的图形数据');
+                if (code !== this.dict.size) {
+                    throw new Error('无效的图形数据');
+                }
 
                 const seq = this.getCodeSeq(prevCode);
                 this.insertSeq(seq.concat(seq[0]));
             }
             outputs.push(...this.getCodeSeq(code));
 
-            // 当字典长度大于颜色数的时候, 下个code占位数增加
+            // 当字典长度等于颜色数的时候, 下个code占位数增加
             if (this.dict.size === (1 << this.colorSize) && this.colorSize < 12) {
                 this.colorSize += 1;
             }

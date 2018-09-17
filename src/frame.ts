@@ -13,7 +13,7 @@ export interface IFrameOpiton {
     x?: number;
     y?: number;
     w?: number;
-    h?: number
+    h?: number,
 }
 
 const defaultOption = {
@@ -119,13 +119,6 @@ export default class Frame {
      */
     palette: number[] = [];
 
-    /**
-     * 最小颜色深度
-     *
-     * @type {number}
-     * @memberof Frame
-     */
-    colorDepth:number = 2;
 
     /**
      * 透明颜色在调色板的索引
@@ -153,13 +146,11 @@ export default class Frame {
     useInput: boolean = false;
 
     /**
-     * 数据块 用来渲染
+     *像素
      *
      * @type {number[]}
      * @memberof Frame
      */
-    bytes?: number[] = [];
-
     pixels!: number[];
 
     get width() {
@@ -176,38 +167,6 @@ export default class Frame {
         return this.h;
     }
 
-    decodeToPixels() {
-        const decoder = new LZWDecode(this.colorDepth);
-        if (!this.bytes) throw new Error('缺少图像数据');
-        this.pixels = [];
-        const data = decoder.decode(new Uint8Array(this.bytes));
-        if (!this.isInterlace) {
-            data.forEach((k) => {
-                this.pixels.push(this.palette[k * 3]);
-                this.pixels.push(this.palette[k * 3 + 1]);
-                this.pixels.push(this.palette[k * 3 + 2]);
-                this.pixels.push(k === this.transparentColorIndex ? 0 : 255);
-            });
-        } else {
-            let start = [0, 4, 2, 1];
-            let inc = [8, 8, 4, 2];
-            let index = 0;
-            for (let pass = 0; pass < 4; pass++) {
-                for (let i = start[pass]; i < this.h; i += inc[pass]) {
-                    for (let j = 0; j < this.w; j++) {
-                        const idx = (i - 1) * this.w * 4 + j * 4;
-                        const k = data[index];
-                        this.pixels[idx] = this.palette[k * 3];
-                        this.pixels[idx + 1] = this.palette[k * 3 + 1];
-                        this.pixels[idx + 2] = this.palette[k * 3 + 2];
-                        this.pixels[idx + 3] = k === this.transparentColorIndex ? 0 : 255;
-                        index += 1;
-                    }
-                }
-            }
-        }
-    }
-
     ctx?: CanvasRenderingContext2D;
 
     /**
@@ -220,7 +179,7 @@ export default class Frame {
      */
     renderToCanvas(retry = false) {
         if(this.ctx && !retry) return this.ctx;
-        if (!this.pixels) this.decodeToPixels();
+        if (!this.pixels) throw new Error('缺少数据');
         const canvas = document.createElement('canvas');
         this.ctx = canvas.getContext('2d')!;
         canvas.width = this.width
