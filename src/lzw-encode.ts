@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-17 01:18:07
+ * @Last Modified time: 2018-09-17 18:11:08
  */
 // FIXME: 没有实际测试过
 export type Dictionary = Map<string | number, number>;
@@ -64,6 +64,7 @@ export default class LzwEncoder {
     }
 
     encode(str: number[]) {
+        debugger;
         let current;
         let next;
         let code;

@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-17 15:42:40
+ * @Last Modified time: 2018-09-17 18:28:33
  */
 import Frame, { IFrameOpiton } from './frame';
 
@@ -30,10 +30,14 @@ export default class Gif {
         this.fieldReader.readAsArrayBuffer(data);
         return new Promise(res => {
             this.fieldReader.onload = () => {
-                this.onLoad();
+                this.onLoad(new Uint8Array(this.fieldReader.result as ArrayBuffer));
                 res(this);
             }
         }) as Promise<this>;
+    }
+
+    readCodes(data: number[]) {
+        this.onLoad(data);
     }
 
     private fieldReader!: FileReader;
@@ -42,8 +46,8 @@ export default class Gif {
 
     private currentOptions?: IFrameOpiton;
 
-    private onLoad() {
-        this.dataSource = new Uint8Array(this.fieldReader.result as ArrayBuffer);
+    private onLoad(dataSource: number[] | Uint8Array) {
+        this.dataSource = new Uint8Array(dataSource);
         this.readHeader();
         this.readLogicalScreenDescriptor();
 
@@ -281,9 +285,6 @@ export default class Gif {
         const m = this.readOne();
         const isLocalColor = !!(0b1 & m >> 7);
         frame.isInterlace = !!(0b1 & m >> 6);
-        if (isLocalColor) {
-            debugger;
-        }
         frame.sort = !!(0b1 & m >> 5);
         const colorSize = (0b111 & m);
 

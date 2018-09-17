@@ -9,24 +9,21 @@
     constructor(colorDepth: number) {
         this.defaultColorSize = Math.max(1, colorDepth);
         this.init();
-        (window as any).decode = this;
     }
 
-    defaultColorSize: number;
+    private defaultColorSize: number;
 
-    colorSize!: number;
+    private colorSize!: number;
 
-    dict!: Map<number, number[]>;
+    private dict!: Map<number, number[]>;
 
-    clearCode!: number;
+    private clearCode!: number;
 
-    endCode!: number;
+    private endCode!: number;
 
-    buffers: Uint8Array = new Uint8Array();
+    private buffers: Uint8Array = new Uint8Array();
 
-    data: number[] = [];
-
-    init() {
+    private init() {
         this.colorSize = this.defaultColorSize;
         this.dict = new Map();
         for (let index = 0; index < 2 ** this.colorSize; index++) {
@@ -39,23 +36,23 @@
         this.insertSeq([]);
     }
 
-    insertSeq(str: number[]) {
+    private insertSeq(str: number[]) {
         const index = this.dict.size;
         
         this.dict.set(index, str);
     }
 
-    getCodeSeq(code: number) {
+    private getCodeSeq(code: number) {
         return this.dict.get(code)!;
     }
 
-    index = 0;
+    private index = 0;
 
-    remainingBits = 8;
+    private remainingBits = 8;
 
-    codes: number[] = [];
+    private codes: number[] = [];
 
-    nextCode() {
+    private nextCode() {
         let colorSize = this.colorSize;
         let code = 0;
         let diff = 0;
@@ -94,19 +91,17 @@
                 continue;
             }
 
-
             if (code < this.dict.size) {
                 if (prevCode !== this.clearCode) {
                     this.insertSeq(this.getCodeSeq(prevCode).concat(this.getCodeSeq(code)[0]));
                 }
             } else {
-                if (code !== this.dict.size) {
-                    throw new Error('LZW解析出错');
-                }
+                if (code !== this.dict.size) throw new Error('无效的图形数据');
+
                 const seq = this.getCodeSeq(prevCode);
                 this.insertSeq(seq.concat(seq[0]));
             }
-            outputs.push.apply(outputs, this.getCodeSeq(code));
+            outputs.push(...this.getCodeSeq(code));
 
             // 当字典长度大于颜色数的时候, 下个code占位数增加
             if (this.dict.size === (1 << this.colorSize) && this.colorSize < 12) {
