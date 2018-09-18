@@ -68,8 +68,11 @@ export default class GIFEncoder {
         if (pixels.length / 3 > 254) {
             this.neuQuant = new NeuQuant(pixels, { netsize: 1 << (this.colorDepth) - 1, samplefac }); // 减1保留透明色位置
             this.neuQuant.buildColorMap();
-            this.palette = this.neuQuant.getColorMap();
+            this.palette = Array.from(this.neuQuant.getColorMap());
         } else {
+            if (this.transparencIndex !== undefined && pixels.length / 3 === 1 << maxColorDepth) {
+                this.colorDepth += 1;
+            }
             this.palette = pixels;
         }
 
@@ -77,7 +80,6 @@ export default class GIFEncoder {
             const index = this.palette!.length;
             this.transparencIndex = index / 3;
             this.palette!.push(...[0, 0, 0]);
-            this.colorMap.set('a', index / 3);
         }
 
         while (this.palette!.length < (1 << this.colorDepth) * 3) {
@@ -194,7 +196,7 @@ export default class GIFEncoder {
             this.addCode(0xf9); // al
             this.addCode(4); // byte size
             let m = 0;
-            m += frame.displayType << 3; // sortFlag
+            m += 1 << 2; // sortFlag
             m += +frame.useInput << 1;
             m += this.transparencIndex !== undefined ? 1 : 0;
             this.addCode(m);
@@ -204,10 +206,10 @@ export default class GIFEncoder {
 
             // 2. image Descriptor
             this.addCode(0x2c);
-            this.addCodes(this.numberToBytes(frame.x));
-            this.addCodes(this.numberToBytes(frame.y));
-            this.addCodes(this.numberToBytes(frame.w));
-            this.addCodes(this.numberToBytes(frame.h));
+            this.addCodes(this.numberToBytes(0)); //TODO: 需要改为frame的位置, 下同
+            this.addCodes(this.numberToBytes(0));
+            this.addCodes(this.numberToBytes(this.frames[0].w));
+            this.addCodes(this.numberToBytes(this.frames[0].h));
 
             m = 0;
             m += +frame.isInterlace << 6;

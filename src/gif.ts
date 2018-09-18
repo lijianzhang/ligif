@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-18 23:07:49
+ * @Last Modified time: 2018-09-18 23:51:55
  */
 import Frame, { IFrameOpiton } from './frame';
 import LzwDecode from './lzw-decode';
@@ -251,14 +251,12 @@ export default class Gif {
         this.readOne(); // 跳过
         const m = this.readOne();
 
-
         const displayType = 0b111 & m >> 2;
         const useInput = !!(0b1 & m >> 1);
         const transparentColorFlag = !!(m & 0b1);
         const delay = this.readOne() + (this.readOne() << 8);
 
         const transparentColorIndex = this.readOne();
-
         this.currentOptions = {
             displayType,
             useInput,
@@ -271,7 +269,6 @@ export default class Gif {
     private readImageDescriptor() {
         
         const option = this.currentOptions || {};
-
         const frame = new Frame(option);
         frame.prevFrame = this.frames[this.frames.length - 1];
         this.frames.push(frame);

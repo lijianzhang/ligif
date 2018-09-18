@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-16 00:10:40
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-17 01:21:48
+ * @Last Modified time: 2018-09-18 23:33:09
  */
 import LZWDecode from './lzw-decode';
 export interface IFrameOpiton {
@@ -187,6 +187,7 @@ export default class Frame {
         let imgData = this.ctx.createImageData(this.w, this.h);
         this.pixels!.forEach((v, i) => imgData.data[i] = v);
         this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
+
         if ((this.displayType === 1 || this.displayType === 2) && this.prevFrame)  {
             if (!this.prevFrame.ctx) this.prevFrame.renderToCanvas(retry);
                 imgData = this.ctx.getImageData(0, 0, this.width, this.height);
@@ -201,6 +202,7 @@ export default class Frame {
                 }
                 this.ctx.putImageData(imgData, 0, 0);
         }
+
         return this.ctx;
         // TODO: When displayType is equal to 3
     }

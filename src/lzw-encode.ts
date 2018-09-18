@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-18 18:17:54
+ * @Last Modified time: 2018-09-18 23:53:38
  */
 
 export type Dictionary = Map<string | number, number>;
@@ -69,7 +69,7 @@ export default class LzwEncoder {
             if (this.dict.size == 4096) {
                 this.pushCode(this.clearCode);
                 this.init();
-            }  else if (this.dict.size === (1 << this.colorSize) + 1) {
+            }  else if (this.dict.size === (1 << this.colorSize)) {
                 this.colorSize += 1;
             }
             while (next !== undefined && this.getSeqCode(`${current},${next}`) !== undefined) {
