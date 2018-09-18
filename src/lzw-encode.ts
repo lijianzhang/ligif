@@ -2,14 +2,14 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-17 18:11:08
+ * @Last Modified time: 2018-09-18 18:17:54
  */
 
 export type Dictionary = Map<string | number, number>;
 
 export default class LzwEncoder {
     constructor(width: number, height: number, colorDepth: number) {
-        this.defaultColorSize = Math.max(1, colorDepth);
+        this.defaultColorSize = Math.max(2, colorDepth);
         this.buffers = new ArrayBuffer(width * height + 100);
         this.dataView = new DataView(this.buffers);
         this.init();
@@ -33,22 +33,22 @@ export default class LzwEncoder {
 
     index = 0;
 
+    codes: number[] = [];
+
     init() {
-        this.colorSize = this.defaultColorSize;
+        this.colorSize = this.defaultColorSize + 1;
         this.dict.clear();
-        for (let index = 0; index < 2 ** this.colorSize; index++) {
+        for (let index = 0; index < 2 ** this.defaultColorSize; index++) {
             this.insertSeq(index);
         }
-        this.clearCode = 1 << this.colorSize;
+        this.clearCode = 1 << this.defaultColorSize;
         this.endCode = this.clearCode + 1;
-        this.colorSize += 1;
         this.insertSeq(this.clearCode);
         this.insertSeq(this.endCode);
     }
 
     insertSeq(str: string | number) {
         const index = this.dict.size;
-
         this.dict.set(str, index);
     }
 
@@ -64,34 +64,26 @@ export default class LzwEncoder {
         let i = 0;
         this.pushCode(this.clearCode);
         while(i < str.length) {
-
             current = str[i];
             next = str[i + 1];
-
-
-            while (next !== undefined && this.getSeqCode(`${current}${next}`) !== undefined) {
-                current = `${current}${next}`;
+            if (this.dict.size == 4096) {
+                this.pushCode(this.clearCode);
+                this.init();
+            }  else if (this.dict.size === (1 << this.colorSize) + 1) {
+                this.colorSize += 1;
+            }
+            while (next !== undefined && this.getSeqCode(`${current},${next}`) !== undefined) {
+                current = `${current},${next}`;
                 i += 1
                 next = str[i + 1];
             }
             
             code = this.getSeqCode(current);
             if (next !== undefined) {
-                this.insertSeq(`${current}${next}`);
-                
+                this.insertSeq(`${current},${next}`);   
             }
             this.pushCode(code);
-
             i += 1;
-
-            if (this.dict.size === (1 << this.colorSize) + 1) {
-                if (this.colorSize == 12) {
-                    this.pushCode(this.clearCode);
-                    this.init();
-                } else {
-                    this.colorSize += 1;
-                }
-            }
 
         }
         this.pushCode(this.endCode);
@@ -100,6 +92,7 @@ export default class LzwEncoder {
     }
 
     pushCode(code: number) {
+        this.codes.push(code);
         let colorSize = this.colorSize;
         let data = code;
 

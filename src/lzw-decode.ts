@@ -3,11 +3,11 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:20
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-17 00:55:15
+ * @Last Modified time: 2018-09-18 18:17:31
  */
  export default class LzwDecode {
     constructor(colorDepth: number) {
-        this.defaultColorSize = Math.max(1, colorDepth);
+        this.defaultColorSize = Math.max(2, colorDepth);
         this.init();
     }
 
@@ -57,8 +57,6 @@
         let code = 0;
         let diff = 0;
 
-        // if (this.codes.length === 129) debugger;
-
         while (colorSize > 0) {
             const buffer = this.buffers[this.index];
             if (buffer === undefined) {
@@ -87,7 +85,6 @@
         while (true) {
             prevCode = code;
             code = this.nextCode();
-
             if (code == this.endCode) break;
 
             if (code == this.clearCode) {
@@ -114,6 +111,7 @@
                 this.colorSize += 1;
             }
         }
+
         return outputs;
     }
  }

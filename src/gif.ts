@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-17 18:28:33
+ * @Last Modified time: 2018-09-18 17:52:06
  */
 import Frame, { IFrameOpiton } from './frame';
 import LzwDecode from './lzw-decode';
@@ -197,10 +197,10 @@ export default class Gif {
         let index = 3;
         while (index <= len) {
             // TODO: 看看有没有更好的写法
-            let rpg = this.read(3);
-            palette.push(rpg[0]);
-            palette.push(rpg[1]);
-            palette.push(rpg[2]);
+            let rgb = this.read(3);
+            palette.push(rgb[0]);
+            palette.push(rgb[1]);
+            palette.push(rgb[2]);
             index += 3;
         };
         return palette;
@@ -296,7 +296,7 @@ export default class Gif {
             frame.palette = this.palette;
         }
 
-        const colorDepth = this.readOne() || this.colorDepth;
+        const colorDepth = this.readOne();
         // 解析图像数据
         let data: number[] = []
         while (true) {
@@ -304,7 +304,6 @@ export default class Gif {
             if (len) {
                 this.read(len).forEach(v => data.push(v));
             } else {
-                console.log('colorSize', colorSize, 'colorDepth', colorDepth);
                 this.decodeToPixels(frame, data, colorDepth);
                 break;
             }
@@ -358,7 +357,7 @@ export default class Gif {
 
         const arr = this.read(len);
         this.appVersion = arr.reduce((s, c) => s + String.fromCharCode(c), '');
-        const le = this.readOne();
+        this.readOne();
         this.readOne();
         this.times = this.readOne();
         
@@ -370,7 +369,7 @@ export default class Gif {
     private readCommentExtension() {
         
         const len = this.readOne();
-        const arr = this.read(len + 1); // TODO: 暂时不处理, 直接跳过
+        const arr = this.read(len + 1);
         this.commit = arr.reduce((s, c) => s + String.fromCharCode(c), '');
     }
 }

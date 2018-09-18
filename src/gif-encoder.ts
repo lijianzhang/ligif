@@ -1,6 +1,7 @@
 import Frame from './frame';
 import NeuQuant from './neuquant.js';
 import LzwEncoder from './lzw-encode';
+
 export default class GIFEncoder {
     frames: Frame[] = [];
 
@@ -23,11 +24,7 @@ export default class GIFEncoder {
     }
 
     private numberToBytes(num: number) {
-        const d = num - 255;
-        if (d > 0) {
-            return [255, d];
-        }
-        return [num, 0];
+        return [num & 255, num >> 8];
     }
 
     addCodes(codes: number[]) {
@@ -48,15 +45,42 @@ export default class GIFEncoder {
 
     colorDepth: number = 7;
 
+    colorMap: Map<string, number> = new Map();
+
     generatePalette(frames: Frame[], samplefac: number = 10, colorDepth: number = 7) {
-        this.colorDepth = colorDepth;
-        const pixels = frames.reduce(
-            (arr, frame) => arr.concat(this.getFramePixels(frame)),
-            [] as number[],
-        );
-        this.neuQuant = new NeuQuant(pixels, { netsize: 1 << colorDepth, samplefac });
-        this.neuQuant.buildColorMap();
-        this.palette = this.neuQuant.getColorMap();
+        const pixels = this.getTotalPixels(frames);
+        const maxColorDepth = Math.ceil(Math.log2(pixels.length / 3));
+
+        this.colorDepth = Math.min(colorDepth, maxColorDepth);
+        if (pixels.length / 3 > 255) {
+            this.neuQuant = new NeuQuant(pixels, { netsize: 1 << (this.colorDepth), samplefac });
+            this.neuQuant.buildColorMap();
+            this.palette = this.neuQuant.getColorMap();
+        } else {
+            this.palette = pixels;
+            while (this.palette.length < (1 << this.colorDepth) * 3) {
+                this.palette.push(0, 0, 0);
+            }
+        }
+    }
+
+    getTotalPixels(frames: Frame[]) {
+        let i = 0;
+        return frames.reduce((pixels, frame) => {
+            for (let index = 0; index < frame.pixels.length; index += 4) {
+                const r = frame.pixels[index];
+                const g = frame.pixels[index + 1];
+                const b = frame.pixels[index + 2];
+
+                const c = `${r},${g},${b}`;
+                if (!this.colorMap.has(c)) {
+                    pixels.push(r,g,b);
+                    this.colorMap.set(c, i);
+                    i += 1;
+                }
+            }
+            return pixels;
+        }, [] as number[]);
     }
 
     getFramePixels(frame: Frame) {
@@ -94,8 +118,7 @@ export default class GIFEncoder {
         let m = 1 << 7; // globalColorTableFlag
         m += 0 << 4; // colorResolution
         m += 0 << 3; // sortFlag
-        m += this.colorDepth - 1; // sizeOfGlobalColorTable
-
+        m += Math.log2(this.palette!.length / 3) - 1; // sizeOfGlobalColorTable
         this.addCode(m);
         this.addCode(255); // backgroundColorIndex
         this.addCode(255); // pixelAspectRatio
@@ -104,25 +127,28 @@ export default class GIFEncoder {
 
     findClosest(r: number, g: number, b: number) {
         if (!this.palette) throw new Error('缺少颜色');
-        let minpos = 0;
-        let mind = 256 * 256 * 256;
+        if (this.neuQuant) {
+            let minpos = 0;
+            let mind = 256 * 256 * 256;
 
-        for (let i = 0, l = this.palette.length; i < l; ) {
-            const dr = r - this.palette[i++];
-            const dg = g - this.palette[i++];
-            const db = b - this.palette[i];
-            const d = dr * dr + dg * dg + db * db;
-            const pos = (i / 3) | 0;
+            for (let i = 0; i < this.palette.length; i += 3) {
+                const dr = r - this.palette[i];
+                const dg = g - this.palette[i + 1];
+                const db = b - this.palette[i + 2];
+                const d = dr * dr + dg * dg + db * db;
+                const pos = (i / 3) | 0;
 
-            if (d < mind) {
-                mind = d;
-                minpos = pos;
+                if (d < mind) {
+                    mind = d;
+                    minpos = pos;
+                }
+
+                i++;
             }
-
-            i++;
+            return minpos;
         }
-
-        return minpos;
+        const c = `${r},${g},${b}`;
+        return this.colorMap.get(c)!;
     }
 
     wirteFrames() {
@@ -154,10 +180,10 @@ export default class GIFEncoder {
 
             // Image Data
             this.addCode(this.colorDepth);
-
+            
             const indexs: number[] = [];
             for (let i = 0; i < frame.pixels.length; i += 4) {
-            const r = frame.pixels[i];
+                const r = frame.pixels[i];
                 const g = frame.pixels[i + 1];
                 const b = frame.pixels[i + 2];
                 indexs.push(this.findClosest(r, g, b));
@@ -166,7 +192,6 @@ export default class GIFEncoder {
             const encoder = new LzwEncoder(frame.w, frame.h, this.colorDepth);
             const codes = Array.from(encoder.encode(indexs));
             let len = codes.length;
-
             while (len > 0) {
                 this.addCode(Math.min(len, 0xFF));
                 this.addCodes(codes.splice(0, 0xFF));
