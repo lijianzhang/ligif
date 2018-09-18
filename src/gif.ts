@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-18 17:52:06
+ * @Last Modified time: 2018-09-18 23:07:49
  */
 import Frame, { IFrameOpiton } from './frame';
 import LzwDecode from './lzw-decode';

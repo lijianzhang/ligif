@@ -18,7 +18,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
         const gIFEncoder = new GIFEncoder();
         (window as any).gIFEncoder = gIFEncoder;
         gIFEncoder.frames = gif.frames;
-        gIFEncoder.generate(1);
+        gIFEncoder.generate();
         const b = new Gif();
         (window as any).b = b;
         b.readCodes(gIFEncoder.codes);
@@ -33,28 +33,26 @@ document.getElementById('main').addEventListener('dragover', function(e) {
 
 const img = document.getElementById('img') as HTMLImageElement;
 
-img.onload = () => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = img.width;
-    canvas.height = img.height;
+// setTimeout(() => {
+//     console.log(123);
+//     const canvas = document.createElement('canvas');
+//     const ctx = canvas.getContext('2d');
+//     canvas.width = img.width;
+//     canvas.height = img.height;
 
-    ctx.drawImage(img, 0, 0);
-    // canvas.toBlob((res) => {
-    const frame = new Frame();
-    window.bb = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    frame.pixels = Array.from(ctx.getImageData(0, 0, canvas.width, canvas.height).data);
-    frame.w = canvas.width;
-    frame.h = canvas.height;
-    const encoder = new GIFEncoder();
-    window.encoder = encoder;
-    encoder.addFrame(frame);
-    encoder.generate(1, 8);
-    const decoder = new Gif();
-    window.decoder = decoder;
-    decoder.readCodes(encoder.codes);
-    decoder.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
-}
+//     ctx.drawImage(img, 0, 0);
+//     // canvas.toBlob((res) => {
+//     const frame = new Frame();
+//     frame.pixels = Array.from(ctx.getImageData(0, 0, canvas.width, canvas.height).data);
+//     frame.w = canvas.width;
+//     frame.h = canvas.height;
+//     const encoder = new GIFEncoder();
+//     encoder.addFrame(frame);
+//     encoder.generate(1);
+//     const decoder = new Gif();
+//     decoder.readCodes(encoder.codes);
+//     decoder.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+// }, 1000);
 
 // setTimeout(() => {
 //     const canvas = document.createElement('canvas');

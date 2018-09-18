@@ -13,7 +13,7 @@ export default class GIFEncoder {
 
     generate(samplefac?: number, colorDepth?: number) {
         this.writeFlag();
-        this.generatePalette(this.frames, samplefac, colorDepth);
+        this.generatePalette(samplefac, colorDepth);
         this.writeLogicalScreenDescriptor();
         this.wirteFrames();
         this.addCode(0x3b);
@@ -41,38 +41,65 @@ export default class GIFEncoder {
 
     neuQuant?: NeuQuant;
 
+    /**
+     * 调色板
+     */
     palette?: number[] = [];
 
+    /**
+     * 颜色深度
+     */
     colorDepth: number = 7;
+
+    transparencIndex?: number;
+
+    imgDatas: number[][] = [];
 
     colorMap: Map<string, number> = new Map();
 
-    generatePalette(frames: Frame[], samplefac: number = 10, colorDepth: number = 7) {
-        const pixels = this.getTotalPixels(frames);
+    generatePalette(samplefac: number = 10, colorDepth: number = 7) {
+        const imgDatas = this.getFrameImageDatas(this.frames);
+        this.imgDatas =imgDatas;
+        const pixels = this.getTotalPixels(imgDatas);
         const maxColorDepth = Math.ceil(Math.log2(pixels.length / 3));
 
         this.colorDepth = Math.min(colorDepth, maxColorDepth);
-        if (pixels.length / 3 > 255) {
-            this.neuQuant = new NeuQuant(pixels, { netsize: 1 << (this.colorDepth), samplefac });
+
+        if (pixels.length / 3 > 254) {
+            this.neuQuant = new NeuQuant(pixels, { netsize: 1 << (this.colorDepth) - 1, samplefac }); // 减1保留透明色位置
             this.neuQuant.buildColorMap();
             this.palette = this.neuQuant.getColorMap();
         } else {
             this.palette = pixels;
-            while (this.palette.length < (1 << this.colorDepth) * 3) {
-                this.palette.push(0, 0, 0);
-            }
+        }
+
+        if (this.transparencIndex !== undefined) {
+            const index = this.palette!.length;
+            this.transparencIndex = index / 3;
+            this.palette!.push(...[0, 0, 0]);
+            this.colorMap.set('a', index / 3);
+        }
+
+        while (this.palette!.length < (1 << this.colorDepth) * 3) {
+            this.palette!.push(0, 0, 0);
         }
     }
 
-    getTotalPixels(frames: Frame[]) {
+    getTotalPixels(frames: number[][]) {
         let i = 0;
         return frames.reduce((pixels, frame) => {
-            for (let index = 0; index < frame.pixels.length; index += 4) {
-                const r = frame.pixels[index];
-                const g = frame.pixels[index + 1];
-                const b = frame.pixels[index + 2];
+            for (let index = 0; index < frame.length; index += 4) {
+                const r = frame[index];
+                const g = frame[index + 1];
+                const b = frame[index + 2];
+                const a = frame[index + 3];
 
-                const c = `${r},${g},${b}`;
+                const c = a === 0 ? 'a' : `${r},${g},${b}`;
+
+                if (a === 0) { //获取透明颜色索引
+                    this.transparencIndex = i;
+                }
+
                 if (!this.colorMap.has(c)) {
                     pixels.push(r,g,b);
                     this.colorMap.set(c, i);
@@ -83,25 +110,34 @@ export default class GIFEncoder {
         }, [] as number[]);
     }
 
-    getFramePixels(frame: Frame) {
-        const w = frame.w;
-        const h = frame.h;
-        const data = frame.pixels;
-        const pixels = new Array(w * h * 3);
+    getFrameImageDatas(frames: Frame[]) {
+        const [fistFrame, ...otherFrams] = frames;
+        let lastImageData = [...fistFrame.pixels];
+        let frameImageDatas = [[...fistFrame.pixels]];
 
-        let srcPos = 0;
-        let count = 0;
-
-        for (var i = 0; i < h; i++) {
-            for (var j = 0; j < w; j++) {
-                pixels[count++] = data[srcPos++];
-                pixels[count++] = data[srcPos++];
-                pixels[count++] = data[srcPos++];
-                srcPos++;
+        otherFrams.forEach((frame, i) => {
+            frameImageDatas[i + 1] = [];
+            const data = frameImageDatas[i + 1];
+            for (let index = 0; index < frame.pixels.length; index += 4) {
+                const r1 = lastImageData[index];
+                const r2 = frame.pixels[index];
+                const g1 = lastImageData[index + 1];
+                const g2 = frame.pixels[index + 1];
+                const b1 = lastImageData[index + 2];
+                const b2 = frame.pixels[index + 2];
+                const a = frame.pixels[index + 3];
+                if (r1 === r2 && g1 === g2 && b1 === b2) {
+                    data.push(0, 0, 0, 0);
+                }  else {
+                    data.push(r1, g1, b1, a);
+                    lastImageData[index] = r1;
+                    lastImageData[index + 1] = g1;
+                    lastImageData[index + 2] = b1;
+                    lastImageData[index + 3] = a;
+                }
             }
-        }
-
-        return pixels;
+        });
+        return frameImageDatas;
     }
 
     /**
@@ -120,7 +156,7 @@ export default class GIFEncoder {
         m += 0 << 3; // sortFlag
         m += Math.log2(this.palette!.length / 3) - 1; // sizeOfGlobalColorTable
         this.addCode(m);
-        this.addCode(255); // backgroundColorIndex
+        this.addCode(0); // backgroundColorIndex
         this.addCode(255); // pixelAspectRatio
         this.addCodes(this.palette!);
     }
@@ -152,7 +188,7 @@ export default class GIFEncoder {
     }
 
     wirteFrames() {
-        this.frames.forEach(frame => {
+        this.frames.forEach((frame, fIndex) => {
             // 1. Graphics Control Extension
             this.addCode(0x21); // exc flag
             this.addCode(0xf9); // al
@@ -160,10 +196,10 @@ export default class GIFEncoder {
             let m = 0;
             m += frame.displayType << 3; // sortFlag
             m += +frame.useInput << 1;
-            m += frame.transparentColorIndex ? 1 : 0;
+            m += this.transparencIndex !== undefined ? 1 : 0;
             this.addCode(m);
             this.addCodes(this.numberToBytes(frame.delay));
-            this.addCode(frame.transparentColorIndex || 0);
+            this.addCode(this.transparencIndex || 0);
             this.addCode(0);
 
             // 2. image Descriptor
@@ -182,15 +218,23 @@ export default class GIFEncoder {
             this.addCode(this.colorDepth);
             
             const indexs: number[] = [];
-            for (let i = 0; i < frame.pixels.length; i += 4) {
-                const r = frame.pixels[i];
-                const g = frame.pixels[i + 1];
-                const b = frame.pixels[i + 2];
-                indexs.push(this.findClosest(r, g, b));
+            const imageData = this.imgDatas[fIndex];
+
+            for (let i = 0; i < imageData.length; i += 4) {
+                if (imageData[i + 3] === 0) {
+
+                    indexs.push(this.transparencIndex!);
+                } else {
+                    const r = frame.pixels[i];
+                    const g = frame.pixels[i + 1];
+                    const b = frame.pixels[i + 2];
+                    indexs.push(this.findClosest(r, g, b));
+                }
             }
 
             const encoder = new LzwEncoder(frame.w, frame.h, this.colorDepth);
             const codes = Array.from(encoder.encode(indexs));
+
             let len = codes.length;
             while (len > 0) {
                 this.addCode(Math.min(len, 0xFF));
