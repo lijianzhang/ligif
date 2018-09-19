@@ -62,8 +62,14 @@ export default class GIFEncoder {
     colorMap: Map<string, number> = new Map();
 
     generatePalette(samplefac: number = 10, colorDepth: number = 8) {
+        console.time('generateFrameImageDatas');
         this.generateFrameImageDatas(this.frames);
+        console.timeEnd('generateFrameImageDatas');
+
+        console.time('getTotalPixels');
         const pixels = this.getTotalPixels(this.frames);
+        console.timeEnd('getTotalPixels');
+
         const maxColorDepth = Math.ceil(Math.log2(pixels.length / 3));
 
         this.colorDepth = Math.min(colorDepth, maxColorDepth);
@@ -113,6 +119,7 @@ export default class GIFEncoder {
         }, [] as number[]);
     }
 
+    // TODO: 1.太耗时, 2可能会出现误差
     generateFrameImageDatas(frames: Frame[]) {
         const [firstFrame, ...otherFrams] = frames;
         let lastImageData = [...firstFrame.pixels];
@@ -121,6 +128,7 @@ export default class GIFEncoder {
         otherFrams.forEach((frame) => {
             frame.imgData = [];
             const { x, y, w } = frame;
+            let alphaList: number[] = [];
             for (let index = 0; index < frame.pixels.length; index += 4) {
                 const offset = ((Math.floor((index / 4) / w) + y) * frame.width + x + (index / 4 % w)) * 4;
                 const r1 = frame.pixels[index];
@@ -132,29 +140,61 @@ export default class GIFEncoder {
                 const a = frame.pixels[index + 3];
                 if (r1 === r2 && g1 === g2 && b1 === b2) {
                     frame.imgData.push(0, 0, 0, 0);
+                    alphaList.push(0);
                 }  else {
                     frame.imgData.push(r1, g1, b1, a);
                     lastImageData[offset] = r1;
                     lastImageData[offset + 1] = g1;
                     lastImageData[offset + 2] = b1;
                     lastImageData[offset + 3] = a;
+                    alphaList.push(a);
                 }
             }
-
-            const as = frame.imgData.filter((_, i) => (i + 1) % 4 === 0);
-            let top = Math.floor(as.findIndex(v => v !== 0) / frame.w);
+            
+            let top = Math.floor(alphaList.findIndex(v => v !== 0) / frame.w);
             if (top) {
                 frame.imgData.splice(0, top * frame.w * 4);
+                alphaList.splice(0, top * frame.w);
                 frame.y = top;
                 frame.h -= top;
             }
-            
-            as.reverse();
-            let bottom = Math.floor(as.findIndex(v => v !== 0) / frame.w);
+
+            alphaList.reverse();
+            let bottom = Math.floor(alphaList.findIndex(v => v !== 0) / frame.w);
             if (bottom) {
+                alphaList.splice(-bottom * frame.w);
                 frame.imgData.splice(-bottom * frame.w * 4);
                 frame.h -= bottom;
             }
+            let left = 0;
+            while (true) {
+                const arr =alphaList.filter((v, i) => v === 0 && ((i + 1) % frame.w) === 1 + left);
+                if (arr.length === frame.h) {
+                    left += 1;
+                } else {
+                    break;
+                }
+            }
+
+            let right = 0;
+
+            while (true) {
+                const arr = alphaList.filter((v, i) => v === 0 && ((i + 1) % frame.w) === frame.w - right);
+                if (arr.length === frame.h) {
+                    right += 1;
+                } else {
+                    break;
+                }
+            }
+            frame.imgData = frame.imgData.filter((_, i) => {
+                const range = (Math.floor(i / 4) % frame.w);
+                if ((range < left || range >= (frame.w - right))) {
+                    return false;
+                }
+                return true;
+            })
+            frame.x += left;
+            frame.w -= (left + right)
         });
     }
 
