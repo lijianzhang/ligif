@@ -67,9 +67,8 @@ export default class GIFEncoder {
         const maxColorDepth = Math.ceil(Math.log2(pixels.length / 3));
 
         this.colorDepth = Math.min(colorDepth, maxColorDepth);
-
-        if (pixels.length / 3 > 254) {
-            this.neuQuant = new NeuQuant(pixels, { netsize: 1 << (this.colorDepth), samplefac }); // 减1保留透明色位置
+        if (pixels.length / 3 > 255) {
+            this.neuQuant = new NeuQuant(pixels, { netsize: (1 << this.colorDepth) - 1, samplefac }); // 减1保留透明色位置
             this.neuQuant.buildColorMap();
             this.palette = Array.from(this.neuQuant.getColorMap());
         } else {
@@ -78,7 +77,6 @@ export default class GIFEncoder {
                 this.colorDepth += 1;
             }
         }
-
         if (this.transparencIndex !== undefined) {
             const index = this.palette!.length;
             this.transparencIndex = index / 3;

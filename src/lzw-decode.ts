@@ -3,7 +3,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:20
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-18 18:17:31
+ * @Last Modified time: 2018-09-19 20:27:24
  */
  export default class LzwDecode {
     constructor(colorDepth: number) {
@@ -98,6 +98,8 @@
                 }
             } else {
                 if (code !== this.dict.size) {
+                    console.log(this.codes);
+                    console.log(buffers);
                     throw new Error('无效的图形数据');
                 }
 

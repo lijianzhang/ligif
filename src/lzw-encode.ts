@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-18 23:53:38
+ * @Last Modified time: 2018-09-19 21:13:49
  */
 
 export type Dictionary = Map<string | number, number>;
@@ -69,7 +69,7 @@ export default class LzwEncoder {
             if (this.dict.size == 4096) {
                 this.pushCode(this.clearCode);
                 this.init();
-            }  else if (this.dict.size === (1 << this.colorSize)) {
+            }  else if (this.dict.size === (1 << this.colorSize) + 1) {
                 this.colorSize += 1;
             }
             while (next !== undefined && this.getSeqCode(`${current},${next}`) !== undefined) {
@@ -77,7 +77,6 @@ export default class LzwEncoder {
                 i += 1
                 next = str[i + 1];
             }
-            
             code = this.getSeqCode(current);
             if (next !== undefined) {
                 this.insertSeq(`${current},${next}`);   
@@ -87,7 +86,6 @@ export default class LzwEncoder {
 
         }
         this.pushCode(this.endCode);
-
         return new Uint8Array(this.buffers).slice(0, this.index + 1);
     }
 

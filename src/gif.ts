@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-18 23:51:55
+ * @Last Modified time: 2018-09-19 21:15:05
  */
 import Frame, { IFrameOpiton } from './frame';
 import LzwDecode from './lzw-decode';
@@ -300,6 +300,7 @@ export default class Gif {
             if (len) {
                 this.read(len).forEach(v => data.push(v));
             } else {
+                console.log('data image', data.length);
                 this.decodeToPixels(frame, data, colorDepth);
                 break;
             }
