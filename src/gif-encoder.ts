@@ -3,12 +3,18 @@ import NeuQuant from './neuquant.js';
 import LzwEncoder from './lzw-encode';
 
 export default class GIFEncoder {
-    frames: Frame[] = [];
+    private frames: Frame[] = [];
 
     public codes: number[] = [];
 
     addFrame(frame: Frame) {
+        const preFrame = this.frames[this.frames.length - 1];
+        frame.prevFrame = preFrame;
         this.frames.push(frame);
+    }
+
+    addFrames(frames: Frame[]) {
+        frames.forEach(frame => this.addFrame(frame));
     }
 
     generate(samplefac?: number, colorDepth?: number) {
@@ -49,37 +55,34 @@ export default class GIFEncoder {
     /**
      * 颜色深度
      */
-    colorDepth: number = 7;
+    colorDepth: number = 8;
 
     transparencIndex?: number;
 
-    imgDatas: number[][] = [];
-
     colorMap: Map<string, number> = new Map();
 
-    generatePalette(samplefac: number = 10, colorDepth: number = 7) {
-        const imgDatas = this.getFrameImageDatas(this.frames);
-        this.imgDatas =imgDatas;
-        const pixels = this.getTotalPixels(imgDatas);
+    generatePalette(samplefac: number = 10, colorDepth: number = 8) {
+        this.generateFrameImageDatas(this.frames);
+        const pixels = this.getTotalPixels(this.frames);
         const maxColorDepth = Math.ceil(Math.log2(pixels.length / 3));
 
         this.colorDepth = Math.min(colorDepth, maxColorDepth);
 
         if (pixels.length / 3 > 254) {
-            this.neuQuant = new NeuQuant(pixels, { netsize: 1 << (this.colorDepth) - 1, samplefac }); // 减1保留透明色位置
+            this.neuQuant = new NeuQuant(pixels, { netsize: 1 << (this.colorDepth), samplefac }); // 减1保留透明色位置
             this.neuQuant.buildColorMap();
             this.palette = Array.from(this.neuQuant.getColorMap());
         } else {
-            if (this.transparencIndex !== undefined && pixels.length / 3 === 1 << maxColorDepth) {
+            this.palette = pixels;
+            if (this.transparencIndex !== undefined && this.palette.length / 3 === 1 << this.colorDepth) {
                 this.colorDepth += 1;
             }
-            this.palette = pixels;
         }
 
         if (this.transparencIndex !== undefined) {
             const index = this.palette!.length;
             this.transparencIndex = index / 3;
-            this.palette!.push(...[0, 0, 0]);
+            this.palette!.push(0, 0, 0);
         }
 
         while (this.palette!.length < (1 << this.colorDepth) * 3) {
@@ -87,59 +90,74 @@ export default class GIFEncoder {
         }
     }
 
-    getTotalPixels(frames: number[][]) {
+    getTotalPixels(frames: Frame[]) {
         let i = 0;
         return frames.reduce((pixels, frame) => {
-            for (let index = 0; index < frame.length; index += 4) {
-                const r = frame[index];
-                const g = frame[index + 1];
-                const b = frame[index + 2];
-                const a = frame[index + 3];
+            for (let index = 0; index < frame.imgData.length; index += 4) {
+                const r = frame.imgData[index];
+                const g = frame.imgData[index + 1];
+                const b = frame.imgData[index + 2];
+                const a = frame.imgData[index + 3];
 
-                const c = a === 0 ? 'a' : `${r},${g},${b}`;
-
+                
                 if (a === 0) { //获取透明颜色索引
                     this.transparencIndex = i;
-                }
-
-                if (!this.colorMap.has(c)) {
-                    pixels.push(r,g,b);
-                    this.colorMap.set(c, i);
-                    i += 1;
+                } else {
+                    const c = `${r},${g},${b}`;
+                    if (!this.colorMap.has(c)) {
+                        pixels.push(r,g,b);
+                        this.colorMap.set(c, i);
+                        i += 1;
+                    }
                 }
             }
             return pixels;
         }, [] as number[]);
     }
 
-    getFrameImageDatas(frames: Frame[]) {
-        const [fistFrame, ...otherFrams] = frames;
-        let lastImageData = [...fistFrame.pixels];
-        let frameImageDatas = [[...fistFrame.pixels]];
+    generateFrameImageDatas(frames: Frame[]) {
+        const [firstFrame, ...otherFrams] = frames;
+        let lastImageData = [...firstFrame.pixels];
+        firstFrame.imgData = firstFrame.pixels; 
 
-        otherFrams.forEach((frame, i) => {
-            frameImageDatas[i + 1] = [];
-            const data = frameImageDatas[i + 1];
+        otherFrams.forEach((frame) => {
+            frame.imgData = [];
+            const { x, y, w } = frame;
             for (let index = 0; index < frame.pixels.length; index += 4) {
-                const r1 = lastImageData[index];
-                const r2 = frame.pixels[index];
-                const g1 = lastImageData[index + 1];
-                const g2 = frame.pixels[index + 1];
-                const b1 = lastImageData[index + 2];
-                const b2 = frame.pixels[index + 2];
+                const offset = ((Math.floor((index / 4) / w) + y) * frame.width + x + (index / 4 % w)) * 4;
+                const r1 = frame.pixels[index];
+                const r2 = lastImageData[offset];
+                const g1 = frame.pixels[index + 1];
+                const g2 = lastImageData[offset + 1];
+                const b1 = frame.pixels[index + 2];
+                const b2 = lastImageData[offset + 2];
                 const a = frame.pixels[index + 3];
                 if (r1 === r2 && g1 === g2 && b1 === b2) {
-                    data.push(0, 0, 0, 0);
+                    frame.imgData.push(0, 0, 0, 0);
                 }  else {
-                    data.push(r1, g1, b1, a);
-                    lastImageData[index] = r1;
-                    lastImageData[index + 1] = g1;
-                    lastImageData[index + 2] = b1;
-                    lastImageData[index + 3] = a;
+                    frame.imgData.push(r1, g1, b1, a);
+                    lastImageData[offset] = r1;
+                    lastImageData[offset + 1] = g1;
+                    lastImageData[offset + 2] = b1;
+                    lastImageData[offset + 3] = a;
                 }
             }
+
+            const as = frame.imgData.filter((_, i) => (i + 1) % 4 === 0);
+            let top = Math.floor(as.findIndex(v => v !== 0) / frame.w);
+            if (top) {
+                frame.imgData.splice(0, top * frame.w * 4);
+                frame.y = top;
+                frame.h -= top;
+            }
+            
+            as.reverse();
+            let bottom = Math.floor(as.findIndex(v => v !== 0) / frame.w);
+            if (bottom) {
+                frame.imgData.splice(-bottom * frame.w * 4);
+                frame.h -= bottom;
+            }
         });
-        return frameImageDatas;
     }
 
     /**
@@ -190,13 +208,13 @@ export default class GIFEncoder {
     }
 
     wirteFrames() {
-        this.frames.forEach((frame, fIndex) => {
+        this.frames.forEach((frame) => {
             // 1. Graphics Control Extension
             this.addCode(0x21); // exc flag
             this.addCode(0xf9); // al
             this.addCode(4); // byte size
             let m = 0;
-            m += 1 << 2; // sortFlag
+            m += 1 << 3; // sortFlag
             m += +frame.useInput << 1;
             m += this.transparencIndex !== undefined ? 1 : 0;
             this.addCode(m);
@@ -206,37 +224,35 @@ export default class GIFEncoder {
 
             // 2. image Descriptor
             this.addCode(0x2c);
-            this.addCodes(this.numberToBytes(0)); //TODO: 需要改为frame的位置, 下同
-            this.addCodes(this.numberToBytes(0));
-            this.addCodes(this.numberToBytes(this.frames[0].w));
-            this.addCodes(this.numberToBytes(this.frames[0].h));
+
+            this.addCodes(this.numberToBytes(frame.x));
+            this.addCodes(this.numberToBytes(frame.y));
+            this.addCodes(this.numberToBytes(frame.w));
+            this.addCodes(this.numberToBytes(frame.h));
 
             m = 0;
-            m += +frame.isInterlace << 6;
-            m += +frame.sort << 5;
+
             this.addCode(m);
 
             // Image Data
             this.addCode(this.colorDepth);
             
             const indexs: number[] = [];
-            const imageData = this.imgDatas[fIndex];
+            const imageData = frame.imgData;
 
             for (let i = 0; i < imageData.length; i += 4) {
                 if (imageData[i + 3] === 0) {
-
                     indexs.push(this.transparencIndex!);
                 } else {
-                    const r = frame.pixels[i];
-                    const g = frame.pixels[i + 1];
-                    const b = frame.pixels[i + 2];
+                    const r = imageData[i];
+                    const g = imageData[i + 1];
+                    const b = imageData[i + 2];
                     indexs.push(this.findClosest(r, g, b));
                 }
             }
 
             const encoder = new LzwEncoder(frame.w, frame.h, this.colorDepth);
             const codes = Array.from(encoder.encode(indexs));
-
             let len = codes.length;
             while (len > 0) {
                 this.addCode(Math.min(len, 0xFF));

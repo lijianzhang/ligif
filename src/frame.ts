@@ -4,7 +4,7 @@
  * @Last Modified by: lijianzhang
  * @Last Modified time: 2018-09-18 23:33:09
  */
-import LZWDecode from './lzw-decode';
+
 export interface IFrameOpiton {
     displayType?: number;
     useInput?: boolean;
@@ -15,6 +15,8 @@ export interface IFrameOpiton {
     w?: number;
     h?: number,
 }
+
+let ii = 0;
 
 const defaultOption = {
     displayType: 0,
@@ -137,6 +139,8 @@ export default class Frame {
      */
     displayType: number = 0;
 
+    imgData: number[] = [];
+
     /**
      * 是否支持用户点击或按揭
      *
@@ -184,11 +188,13 @@ export default class Frame {
         this.ctx = canvas.getContext('2d')!;
         canvas.width = this.width
         canvas.height = this.height;
+
         let imgData = this.ctx.createImageData(this.w, this.h);
         this.pixels!.forEach((v, i) => imgData.data[i] = v);
         this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
 
         if ((this.displayType === 1 || this.displayType === 2) && this.prevFrame)  {
+            ii += 1;
             if (!this.prevFrame.ctx) this.prevFrame.renderToCanvas(retry);
                 imgData = this.ctx.getImageData(0, 0, this.width, this.height);
                 const prevImageData = this.prevFrame.ctx!.getImageData(0, 0, this.width, this.height);
