@@ -49,7 +49,7 @@ export default class GIFEncoder {
     /**
      * 颜色深度
      */
-    colorDepth: number = 7;
+    colorDepth: number = 8;
 
     transparencIndex?: number;
 
@@ -57,7 +57,7 @@ export default class GIFEncoder {
 
     colorMap: Map<string, number> = new Map();
 
-    generatePalette(samplefac: number = 10, colorDepth: number = 7) {
+    generatePalette(samplefac: number = 10, colorDepth: number = 8) {
         const imgDatas = this.getFrameImageDatas(this.frames);
         this.imgDatas =imgDatas;
         const pixels = this.getTotalPixels(imgDatas);
@@ -66,18 +66,20 @@ export default class GIFEncoder {
         this.colorDepth = Math.min(colorDepth, maxColorDepth);
 
         if (pixels.length / 3 > 254) {
-            this.neuQuant = new NeuQuant(pixels, { netsize: 1 << (this.colorDepth) - 1, samplefac }); // 减1保留透明色位置
+            this.neuQuant = new NeuQuant(pixels, { netsize: 1 << (this.colorDepth), samplefac }); // 减1保留透明色位置
             this.neuQuant.buildColorMap();
-            this.palette = this.neuQuant.getColorMap();
+            this.palette = Array.from(this.neuQuant.getColorMap());
         } else {
             this.palette = pixels;
+            if (this.transparencIndex !== undefined && this.palette.length / 3 === 1 << this.colorDepth) {
+                this.colorDepth += 1;
+            }
         }
 
         if (this.transparencIndex !== undefined) {
             const index = this.palette!.length;
             this.transparencIndex = index / 3;
-            this.palette!.push(...[0, 0, 0]);
-            this.colorMap.set('a', index / 3);
+            this.palette!.push(0, 0, 0);
         }
 
         while (this.palette!.length < (1 << this.colorDepth) * 3) {
@@ -94,16 +96,16 @@ export default class GIFEncoder {
                 const b = frame[index + 2];
                 const a = frame[index + 3];
 
-                const c = a === 0 ? 'a' : `${r},${g},${b}`;
-
+                
                 if (a === 0) { //获取透明颜色索引
                     this.transparencIndex = i;
-                }
-
-                if (!this.colorMap.has(c)) {
-                    pixels.push(r,g,b);
-                    this.colorMap.set(c, i);
-                    i += 1;
+                } else {
+                    const c = `${r},${g},${b}`;
+                    if (!this.colorMap.has(c)) {
+                        pixels.push(r,g,b);
+                        this.colorMap.set(c, i);
+                        i += 1;
+                    }
                 }
             }
             return pixels;
@@ -119,12 +121,12 @@ export default class GIFEncoder {
             frameImageDatas[i + 1] = [];
             const data = frameImageDatas[i + 1];
             for (let index = 0; index < frame.pixels.length; index += 4) {
-                const r1 = lastImageData[index];
-                const r2 = frame.pixels[index];
-                const g1 = lastImageData[index + 1];
-                const g2 = frame.pixels[index + 1];
-                const b1 = lastImageData[index + 2];
-                const b2 = frame.pixels[index + 2];
+                const r1 = frame.pixels[index];
+                const r2 = lastImageData[index];
+                const g1 = frame.pixels[index + 1];
+                const g2 = lastImageData[index + 1];
+                const b1 = frame.pixels[index + 2];
+                const b2 = lastImageData[index + 2];
                 const a = frame.pixels[index + 3];
                 if (r1 === r2 && g1 === g2 && b1 === b2) {
                     data.push(0, 0, 0, 0);
@@ -194,7 +196,7 @@ export default class GIFEncoder {
             this.addCode(0xf9); // al
             this.addCode(4); // byte size
             let m = 0;
-            m += frame.displayType << 3; // sortFlag
+            m += 1 << 3; // sortFlag
             m += +frame.useInput << 1;
             m += this.transparencIndex !== undefined ? 1 : 0;
             this.addCode(m);
@@ -222,7 +224,6 @@ export default class GIFEncoder {
 
             for (let i = 0; i < imageData.length; i += 4) {
                 if (imageData[i + 3] === 0) {
-
                     indexs.push(this.transparencIndex!);
                 } else {
                     const r = frame.pixels[i];
