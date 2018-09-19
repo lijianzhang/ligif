@@ -15,14 +15,25 @@ document.getElementById('main').addEventListener('drop', function (e) {
     gif.readData(field).then(gif => {
         gif.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
         (window as any).gif = gif;
-        const gIFEncoder = new GIFEncoder();
-        (window as any).gIFEncoder = gIFEncoder;
-        gIFEncoder.addFrames(gif.frames);
-        gIFEncoder.generate();
-        const b = new Gif();
-        (window as any).b = b;
-        b.readCodes(gIFEncoder.codes);
-        b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+        setTimeout(() => {
+            const gIFEncoder = new GIFEncoder();
+            (window as any).gIFEncoder = gIFEncoder;
+            gIFEncoder.addFrames(gif.frames);
+            gif.frames.forEach((f, i) => {
+                if (i !== 0) {
+                    f.x = 0;
+                    f.y = 0;
+                    f.w = f.width;
+                    f.h = f.height;
+                    f.pixels = Array.from(f.ctx.getImageData(0, 0, f.w, f.h).data);
+                }
+            })
+            gIFEncoder.generate();
+            const b = new Gif();
+            (window as any).b = b;
+            b.readCodes(gIFEncoder.codes);
+            b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+        })
 
     });
 });

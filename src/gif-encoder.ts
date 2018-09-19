@@ -122,25 +122,41 @@ export default class GIFEncoder {
 
         otherFrams.forEach((frame) => {
             frame.imgData = [];
+            const { x, y, w } = frame;
             for (let index = 0; index < frame.pixels.length; index += 4) {
+                const offset = ((Math.floor((index / 4) / w) + y) * frame.width + x + (index / 4 % w)) * 4;
                 const r1 = frame.pixels[index];
-                const r2 = lastImageData[index];
+                const r2 = lastImageData[offset];
                 const g1 = frame.pixels[index + 1];
-                const g2 = lastImageData[index + 1];
+                const g2 = lastImageData[offset + 1];
                 const b1 = frame.pixels[index + 2];
-                const b2 = lastImageData[index + 2];
+                const b2 = lastImageData[offset + 2];
                 const a = frame.pixels[index + 3];
                 if (r1 === r2 && g1 === g2 && b1 === b2) {
                     frame.imgData.push(0, 0, 0, 0);
                 }  else {
                     frame.imgData.push(r1, g1, b1, a);
-                    lastImageData[index] = r1;
-                    lastImageData[index + 1] = g1;
-                    lastImageData[index + 2] = b1;
-                    lastImageData[index + 3] = a;
+                    lastImageData[offset] = r1;
+                    lastImageData[offset + 1] = g1;
+                    lastImageData[offset + 2] = b1;
+                    lastImageData[offset + 3] = a;
                 }
             }
 
+            const as = frame.imgData.filter((_, i) => (i + 1) % 4 === 0);
+            let top = Math.floor(as.findIndex(v => v !== 0) / frame.w);
+            if (top) {
+                frame.imgData.splice(0, top * frame.w * 4);
+                frame.y = top;
+                frame.h -= top;
+            }
+            
+            as.reverse();
+            let bottom = Math.floor(as.findIndex(v => v !== 0) / frame.w);
+            if (bottom) {
+                frame.imgData.splice(-bottom * frame.w * 4);
+                frame.h -= bottom;
+            }
         });
     }
 
@@ -208,14 +224,14 @@ export default class GIFEncoder {
 
             // 2. image Descriptor
             this.addCode(0x2c);
+
             this.addCodes(this.numberToBytes(frame.x));
             this.addCodes(this.numberToBytes(frame.y));
             this.addCodes(this.numberToBytes(frame.w));
             this.addCodes(this.numberToBytes(frame.h));
 
             m = 0;
-            m += +frame.isInterlace << 6;
-            m += +frame.sort << 5;
+
             this.addCode(m);
 
             // Image Data
@@ -228,16 +244,15 @@ export default class GIFEncoder {
                 if (imageData[i + 3] === 0) {
                     indexs.push(this.transparencIndex!);
                 } else {
-                    const r = frame.pixels[i];
-                    const g = frame.pixels[i + 1];
-                    const b = frame.pixels[i + 2];
+                    const r = imageData[i];
+                    const g = imageData[i + 1];
+                    const b = imageData[i + 2];
                     indexs.push(this.findClosest(r, g, b));
                 }
             }
 
             const encoder = new LzwEncoder(frame.w, frame.h, this.colorDepth);
             const codes = Array.from(encoder.encode(indexs));
-
             let len = codes.length;
             while (len > 0) {
                 this.addCode(Math.min(len, 0xFF));

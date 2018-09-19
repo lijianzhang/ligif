@@ -277,7 +277,6 @@ export default class Gif {
         this.frames.push(frame);
         this.currentOptions = undefined;
 
-
         frame.x = this.readOne() + (this.readOne() << 8);
         frame.y = this.readOne() + (this.readOne() << 8);
         frame.w = this.readOne() + (this.readOne() << 8);
@@ -318,9 +317,9 @@ export default class Gif {
         data = decoder.decode(new Uint8Array(data));
         if (!frame.isInterlace) {
             data.forEach((k) => {
-                frame.pixels.push(this.palette[k * 3]);
-                frame.pixels.push(this.palette[k * 3 + 1]);
-                frame.pixels.push(this.palette[k * 3 + 2]);
+                frame.pixels.push(frame.palette[k * 3]);
+                frame.pixels.push(frame.palette[k * 3 + 1]);
+                frame.pixels.push(frame.palette[k * 3 + 2]);
                 frame.pixels.push(k === frame.transparentColorIndex ? 0 : 255);
             });
         } else {
@@ -332,9 +331,9 @@ export default class Gif {
                     for (let j = 0; j < frame.w; j++) {
                         const idx = (i - 1) * frame.w * 4 + j * 4;
                         const k = data[index];
-                        frame.pixels[idx] = this.palette[k * 3];
-                        frame.pixels[idx + 1] = this.palette[k * 3 + 1];
-                        frame.pixels[idx + 2] = this.palette[k * 3 + 2];
+                        frame.pixels[idx] = frame.palette[k * 3];
+                        frame.pixels[idx + 1] = frame.palette[k * 3 + 1];
+                        frame.pixels[idx + 2] = frame.palette[k * 3 + 2];
                         frame.pixels[idx + 3] = k === frame.transparentColorIndex ? 0 : 255;
                         index += 1;
                     }
