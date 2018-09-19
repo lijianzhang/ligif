@@ -17,7 +17,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
         (window as any).gif = gif;
         const gIFEncoder = new GIFEncoder();
         (window as any).gIFEncoder = gIFEncoder;
-        gIFEncoder.frames = gif.frames;
+        gIFEncoder.addFrames(gif.frames);
         gIFEncoder.generate();
         const b = new Gif();
         (window as any).b = b;

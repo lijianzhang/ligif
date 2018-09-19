@@ -137,6 +137,8 @@ export default class Frame {
      */
     displayType: number = 0;
 
+    imgData: number[] = [];
+
     /**
      * 是否支持用户点击或按揭
      *

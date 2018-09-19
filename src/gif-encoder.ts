@@ -3,12 +3,18 @@ import NeuQuant from './neuquant.js';
 import LzwEncoder from './lzw-encode';
 
 export default class GIFEncoder {
-    frames: Frame[] = [];
+    private frames: Frame[] = [];
 
     public codes: number[] = [];
 
     addFrame(frame: Frame) {
+        const preFrame = this.frames[this.frames.length - 1];
+        frame.prevFrame = preFrame;
         this.frames.push(frame);
+    }
+
+    addFrames(frames: Frame[]) {
+        frames.forEach(frame => this.addFrame(frame));
     }
 
     generate(samplefac?: number, colorDepth?: number) {
@@ -53,14 +59,11 @@ export default class GIFEncoder {
 
     transparencIndex?: number;
 
-    imgDatas: number[][] = [];
-
     colorMap: Map<string, number> = new Map();
 
     generatePalette(samplefac: number = 10, colorDepth: number = 8) {
-        const imgDatas = this.getFrameImageDatas(this.frames);
-        this.imgDatas =imgDatas;
-        const pixels = this.getTotalPixels(imgDatas);
+        this.generateFrameImageDatas(this.frames);
+        const pixels = this.getTotalPixels(this.frames);
         const maxColorDepth = Math.ceil(Math.log2(pixels.length / 3));
 
         this.colorDepth = Math.min(colorDepth, maxColorDepth);
@@ -87,14 +90,14 @@ export default class GIFEncoder {
         }
     }
 
-    getTotalPixels(frames: number[][]) {
+    getTotalPixels(frames: Frame[]) {
         let i = 0;
         return frames.reduce((pixels, frame) => {
-            for (let index = 0; index < frame.length; index += 4) {
-                const r = frame[index];
-                const g = frame[index + 1];
-                const b = frame[index + 2];
-                const a = frame[index + 3];
+            for (let index = 0; index < frame.imgData.length; index += 4) {
+                const r = frame.imgData[index];
+                const g = frame.imgData[index + 1];
+                const b = frame.imgData[index + 2];
+                const a = frame.imgData[index + 3];
 
                 
                 if (a === 0) { //获取透明颜色索引
@@ -112,14 +115,13 @@ export default class GIFEncoder {
         }, [] as number[]);
     }
 
-    getFrameImageDatas(frames: Frame[]) {
-        const [fistFrame, ...otherFrams] = frames;
-        let lastImageData = [...fistFrame.pixels];
-        let frameImageDatas = [[...fistFrame.pixels]];
+    generateFrameImageDatas(frames: Frame[]) {
+        const [firstFrame, ...otherFrams] = frames;
+        let lastImageData = [...firstFrame.pixels];
+        firstFrame.imgData = firstFrame.pixels; 
 
-        otherFrams.forEach((frame, i) => {
-            frameImageDatas[i + 1] = [];
-            const data = frameImageDatas[i + 1];
+        otherFrams.forEach((frame) => {
+            frame.imgData = [];
             for (let index = 0; index < frame.pixels.length; index += 4) {
                 const r1 = frame.pixels[index];
                 const r2 = lastImageData[index];
@@ -129,17 +131,17 @@ export default class GIFEncoder {
                 const b2 = lastImageData[index + 2];
                 const a = frame.pixels[index + 3];
                 if (r1 === r2 && g1 === g2 && b1 === b2) {
-                    data.push(0, 0, 0, 0);
+                    frame.imgData.push(0, 0, 0, 0);
                 }  else {
-                    data.push(r1, g1, b1, a);
+                    frame.imgData.push(r1, g1, b1, a);
                     lastImageData[index] = r1;
                     lastImageData[index + 1] = g1;
                     lastImageData[index + 2] = b1;
                     lastImageData[index + 3] = a;
                 }
             }
+
         });
-        return frameImageDatas;
     }
 
     /**
@@ -190,7 +192,7 @@ export default class GIFEncoder {
     }
 
     wirteFrames() {
-        this.frames.forEach((frame, fIndex) => {
+        this.frames.forEach((frame) => {
             // 1. Graphics Control Extension
             this.addCode(0x21); // exc flag
             this.addCode(0xf9); // al
@@ -220,7 +222,7 @@ export default class GIFEncoder {
             this.addCode(this.colorDepth);
             
             const indexs: number[] = [];
-            const imageData = this.imgDatas[fIndex];
+            const imageData = frame.imgData;
 
             for (let i = 0; i < imageData.length; i += 4) {
                 if (imageData[i + 3] === 0) {
