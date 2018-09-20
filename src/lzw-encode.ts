@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-19 21:13:49
+ * @Last Modified time: 2018-09-20 22:51:55
  */
 
 export type Dictionary = Map<string | number, number>;

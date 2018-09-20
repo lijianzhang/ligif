@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-20 16:56:59
+ * @Last Modified time: 2018-09-20 22:51:03
  */
 import Frame, { IFrameOpiton } from './frame';
 import LzwDecode from './lzw-decode';
@@ -278,7 +278,6 @@ export default class Gif {
         frame.y = this.readOne() + (this.readOne() << 8);
         frame.w = this.readOne() + (this.readOne() << 8);
         frame.h = this.readOne() + (this.readOne() << 8);
-
         const m = this.readOne();
         const isLocalColor = !!(0b1 & m >> 7);
         frame.isInterlace = !!(0b1 & m >> 6);
@@ -310,6 +309,7 @@ export default class Gif {
         const decoder = new LzwDecode(colorDepth);
         frame.pixels = [];
         console.time('decode gif');
+        console.log('data len', data.length);
         data = decoder.decode(new Uint8Array(data));
         if (!frame.isInterlace) {
             data.forEach((k) => {

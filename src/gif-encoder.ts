@@ -86,37 +86,6 @@ export default class GIFEncoder {
         } else {
             this.colorDepth = 0;
         }
-        // console.time('generateFrameImageDatas');
-        // this.generateFrameImageDatas(this.frames);
-        // console.timeEnd('generateFrameImageDatas');
-
-        // console.time('getTotalPixels');
-        // const pixels = this.getTotalPixels(this.frames);
-        // console.timeEnd('getTotalPixels');
-
-        // const maxColorDepth = Math.ceil(Math.log2(pixels.length / 3));
-
-        // this.colorDepth = Math.min(colorDepth, maxColorDepth);
-
-        // if (pixels.length / 3 > 255) {
-        //     this.neuQuant = new NeuQuant(pixels, { netsize: (1 << this.colorDepth) - 1, samplefac }); // 减1保留透明色位置
-        //     this.neuQuant.buildColorMap();
-        //     this.palette = Array.from(this.neuQuant.getColorMap());
-        // } else {
-        //     this.palette = pixels;
-        //     if (this.transparencIndex !== undefined && this.palette.length / 3 === 1 << this.colorDepth) {
-        //         this.colorDepth += 1;
-        //     }
-        // }
-        // if (this.transparencIndex !== undefined) {
-        //     const index = this.palette!.length;
-        //     this.transparencIndex = index / 3;
-        //     this.palette!.push(0, 0, 0);
-        // }
-
-        // while (this.palette!.length < (1 << this.colorDepth) * 3) {
-        //     this.palette!.push(0, 0, 0);
-        // }
     }
 
     hasTransparenc = false;
@@ -125,8 +94,11 @@ export default class GIFEncoder {
     localColorMap: Map<Frame, Map<string, number>> = new Map();
 
     /**
-     * 解析帧的图像
-     *
+     * 解析帧的图像: 配置帧图像的颜色和透明数据
+     * TODO: 只用全局调色板不一定生成的gif体积就小, 尤其在颜色深度比较小的 gif 比较明显;
+     *      因为颜色深度变大后, image data 占据的位数也会变大, 所以还要看像素使用的频率, 
+     * 1. 或者改为,首先生成全部局部颜色, 再做对比, 根据颜色使用频率生成全局颜色板 (感觉比较困难, 和影响性能)
+     * 2. 或者改为,当颜色深度超过某一值得时候不再增加?
      * @memberof GIFEncoder
      */
     parseFramePixels(frame: Frame) {
@@ -142,7 +114,7 @@ export default class GIFEncoder {
             const b = frame.pixels[index + 2];
             const a = frame.pixels[index + 3];
             
-            if (a === 0 && !hasTransparenc) {
+            if (a === 0) {
                 hasTransparenc = true;
             } else {
                 const c = `${r},${g},${b}`;
@@ -175,7 +147,7 @@ export default class GIFEncoder {
             this.localColorMap.set(frame, localColorMap);
             frame.palette = rgbPixels;
             if (hasTransparenc) {
-                frame.transparentColorIndex = rgbPixels.length;
+                frame.transparentColorIndex = rgbPixels.length / 3;
                 rgbPixels.push(0, 0, 0);
             }
         } else {
@@ -186,7 +158,8 @@ export default class GIFEncoder {
                 this.palette.push(...globalRgbPixels);
             }
             if (hasTransparenc && this.transparencIndex === undefined) {
-                this.transparencIndex = this.palette.length;
+                this.colorMap.set('a', this.colorMap.size);
+                this.transparencIndex = this.palette.length / 3;
                 this.palette.push(0, 0, 0);
             }
             frame.transparentColorIndex = this.transparencIndex;
@@ -194,43 +167,28 @@ export default class GIFEncoder {
             frame.palette = this.palette;
         }
     }
-
-    getTotalPixels(frames: Frame[]) {
-        let i = 0;
-        return frames.reduce((pixels, frame) => {
-            for (let index = 0; index < frame.imgData.length; index += 4) {
-                const r = frame.imgData[index];
-                const g = frame.imgData[index + 1];
-                const b = frame.imgData[index + 2];
-                const a = frame.imgData[index + 3];
-
-                
-                if (a === 0) { //获取透明颜色索引
-                    this.transparencIndex = i;
-                } else {
-                    const c = `${r},${g},${b}`;
-                    if (!this.colorMap.has(c)) {
-                        pixels.push(r,g,b);
-                        this.colorMap.set(c, i);
-                        i += 1;
-                    }
-                }
-            }
-            return pixels;
-        }, [] as number[]);
-    }
-
-    // TODO: 1.太耗时, 2可能会出现误差
+    
+    /**
+     *
+     * 重新生成像素, 过滤重复的像素, 并裁剪成最小范围
+     * @param {Frame[]} frames
+     * @memberof GIFEncoder
+     */
     generateFrameImageDatas(frames: Frame[]) {
         const [firstFrame, ...otherFrams] = frames;
         let lastImageData = [...firstFrame.pixels];
-        firstFrame.imgData = firstFrame.pixels; 
 
         otherFrams.forEach((frame, i) => {
-            console.time(`generateFrameImageDatas frame ${i}`);
             let imgData: number[] = [];
             const { x, y, w } = frame;
-            let alphaList: number[] = [];
+            // let alphaList: number[] = [];
+            let startNum = 0; // 表示从0开始连续的透明像素的数目
+            let isDone = false;
+            let endNum = 0; // 表示连续的且到最后的透明像素的数目
+            let startOffset = 0;
+            let maxStartOffset = frame.w; //左边空白像素
+            let maxEndOffset = frame.w; // 右边空白像素
+
             for (let index = 0; index < frame.pixels.length; index += 4) {
                 const offset = ((Math.floor((index / 4) / w) + y) * frame.width + x + (index / 4 % w)) * 4;
                 const r1 = frame.pixels[index];
@@ -240,66 +198,61 @@ export default class GIFEncoder {
                 const b1 = frame.pixels[index + 2];
                 const b2 = lastImageData[offset + 2];
                 const a = frame.pixels[index + 3];
-                if (r1 === r2 && g1 === g2 && b1 === b2) {
+
+                if (index / 4 % frame.w === 0) {
+                    startOffset = 0;
+                }
+
+                if ((r1 === r2 && g1 === g2 && b1 === b2) || a === 0) {
                     imgData.push(0, 0, 0, 0);
-                    alphaList.push(0);
+                    if (!isDone) {
+                        startNum += 1;
+                    }
+                    startOffset += 1;
+                    endNum += 1;
                 }  else {
                     imgData.push(r1, g1, b1, a);
                     lastImageData[offset] = r1;
                     lastImageData[offset + 1] = g1;
                     lastImageData[offset + 2] = b1;
                     lastImageData[offset + 3] = a;
-                    alphaList.push(a);
+                    if (!isDone) isDone = true;
+                    maxStartOffset = startOffset < maxStartOffset ? startOffset : maxStartOffset;
+                    endNum = 0;
+                }
+                if (maxEndOffset !== 0 && ((index / 4 + 1) % frame.w === 0)) {
+                    const endOffset = endNum % frame.w;
+                    maxEndOffset = endOffset < maxEndOffset ? endOffset : maxEndOffset;
                 }
             }
 
-            let top = Math.floor(alphaList.findIndex(v => v !== 0) / frame.w);
+
+            const top = Math.floor(startNum / frame.w);
             if (top) {
                 imgData.splice(0, top * frame.w * 4);
-                alphaList.splice(0, top * frame.w);
                 frame.y = top;
                 frame.h -= top;
             }
 
-            alphaList.reverse();
-            let bottom = Math.floor(alphaList.findIndex(v => v !== 0) / frame.w);
+            const bottom = Math.floor(endNum / frame.w);
             if (bottom) {
-                alphaList.splice(-bottom * frame.w);
                 imgData.splice(-bottom * frame.w * 4);
                 frame.h -= bottom;
             }
-            let left = 0;
-            while (true) {
-                const arr =alphaList.filter((v, i) => v === 0 && ((i + 1) % frame.w) === 1 + left);
-                if (arr.length === frame.h) {
-                    left += 1;
-                } else {
-                    break;
-                }
+
+            if (maxEndOffset || maxStartOffset) {
+                imgData = imgData.filter((_, i) => {
+                    const range = (Math.floor(i / 4) % frame.w);
+                    if ((range < maxStartOffset || range >= (frame.w - maxEndOffset))) {
+                        return false;
+                    }
+                    return true;
+                })
+                frame.x += maxStartOffset;
+                frame.w -= (maxStartOffset + maxEndOffset);
             }
 
-            let right = 0;
-
-            while (true) {
-                const arr = alphaList.filter((v, i) => v === 0 && ((i + 1) % frame.w) === frame.w - right);
-                if (arr.length === frame.h) {
-                    right += 1;
-                } else {
-                    break;
-                }
-            }
-            imgData = imgData.filter((_, i) => {
-                const range = (Math.floor(i / 4) % frame.w);
-                if ((range < left || range >= (frame.w - right))) {
-                    return false;
-                }
-                return true;
-            })
-            frame.x += left;
-            frame.w -= (left + right);
             frame.pixels = imgData;
-            if (frame.pixels.length === 0) debugger;
-            console.timeEnd(`generateFrameImageDatas frame ${i}`);
         });
     }
 
@@ -412,6 +365,7 @@ export default class GIFEncoder {
                     indexs.push(this.findClosest(r, g, b, frame));
                 }
             }
+
             const encoder = new LzwEncoder(frame.w, frame.h, colorDepth);
             const codes = Array.from(encoder.encode(indexs));
             let len = codes.length;
