@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-19 21:15:05
+ * @Last Modified time: 2018-09-20 16:56:59
  */
 import Frame, { IFrameOpiton } from './frame';
 import LzwDecode from './lzw-decode';
@@ -284,14 +284,12 @@ export default class Gif {
         frame.isInterlace = !!(0b1 & m >> 6);
         frame.sort = !!(0b1 & m >> 5);
         const colorSize = (0b111 & m);
-
         if (isLocalColor) {
             const len =  2 ** (colorSize + 1) * 3;
             frame.palette = this.readColorTable(len);
         } else {
             frame.palette = this.palette;
         }
-
         const colorDepth = this.readOne();
         // 解析图像数据
         let data: number[] = []
@@ -300,7 +298,6 @@ export default class Gif {
             if (len) {
                 this.read(len).forEach(v => data.push(v));
             } else {
-                console.log('data image', data.length);
                 this.decodeToPixels(frame, data, colorDepth);
                 break;
             }
@@ -312,6 +309,7 @@ export default class Gif {
     decodeToPixels(frame: Frame, data: number[], colorDepth: number) {
         const decoder = new LzwDecode(colorDepth);
         frame.pixels = [];
+        console.time('decode gif');
         data = decoder.decode(new Uint8Array(data));
         if (!frame.isInterlace) {
             data.forEach((k) => {
@@ -338,6 +336,7 @@ export default class Gif {
                 }
             }
         }
+        console.timeEnd('decode gif');
     }
 
     private readPlainTextExtension() {

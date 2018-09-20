@@ -53,7 +53,7 @@ export default class GIFEncoder {
     /**
      * 调色板
      */
-    palette?: number[] = [];
+    palette: number[] = [];
 
     /**
      * 颜色深度
@@ -64,37 +64,134 @@ export default class GIFEncoder {
 
     colorMap: Map<string, number> = new Map();
 
+    /**
+     * 生成全局的调色板
+     *
+     * @param {number} [samplefac=10]
+     * @param {number} [colorDepth=8]
+     * @memberof GIFEncoder
+     */
     generatePalette(samplefac: number = 10, colorDepth: number = 8) {
         console.time('generateFrameImageDatas');
         this.generateFrameImageDatas(this.frames);
         console.timeEnd('generateFrameImageDatas');
 
-        console.time('getTotalPixels');
-        const pixels = this.getTotalPixels(this.frames);
-        console.timeEnd('getTotalPixels');
+        console.time('parseFramePixels');
+        this.frames.forEach(f => this.parseFramePixels(f));
+        console.timeEnd('parseFramePixels');
 
-        const maxColorDepth = Math.ceil(Math.log2(pixels.length / 3));
-
-        this.colorDepth = Math.min(colorDepth, maxColorDepth);
-
-        if (pixels.length / 3 > 255) {
-            this.neuQuant = new NeuQuant(pixels, { netsize: (1 << this.colorDepth) - 1, samplefac }); // 减1保留透明色位置
-            this.neuQuant.buildColorMap();
-            this.palette = Array.from(this.neuQuant.getColorMap());
+        if (this.palette.length) {
+            const maxColorDepth = Math.ceil(Math.log2(this.palette.length / 3));
+            this.colorDepth = Math.min(colorDepth, maxColorDepth);
         } else {
-            this.palette = pixels;
-            if (this.transparencIndex !== undefined && this.palette.length / 3 === 1 << this.colorDepth) {
-                this.colorDepth += 1;
+            this.colorDepth = 0;
+        }
+        // console.time('generateFrameImageDatas');
+        // this.generateFrameImageDatas(this.frames);
+        // console.timeEnd('generateFrameImageDatas');
+
+        // console.time('getTotalPixels');
+        // const pixels = this.getTotalPixels(this.frames);
+        // console.timeEnd('getTotalPixels');
+
+        // const maxColorDepth = Math.ceil(Math.log2(pixels.length / 3));
+
+        // this.colorDepth = Math.min(colorDepth, maxColorDepth);
+
+        // if (pixels.length / 3 > 255) {
+        //     this.neuQuant = new NeuQuant(pixels, { netsize: (1 << this.colorDepth) - 1, samplefac }); // 减1保留透明色位置
+        //     this.neuQuant.buildColorMap();
+        //     this.palette = Array.from(this.neuQuant.getColorMap());
+        // } else {
+        //     this.palette = pixels;
+        //     if (this.transparencIndex !== undefined && this.palette.length / 3 === 1 << this.colorDepth) {
+        //         this.colorDepth += 1;
+        //     }
+        // }
+        // if (this.transparencIndex !== undefined) {
+        //     const index = this.palette!.length;
+        //     this.transparencIndex = index / 3;
+        //     this.palette!.push(0, 0, 0);
+        // }
+
+        // while (this.palette!.length < (1 << this.colorDepth) * 3) {
+        //     this.palette!.push(0, 0, 0);
+        // }
+    }
+
+    hasTransparenc = false;
+
+    // 局部颜色板索引map
+    localColorMap: Map<Frame, Map<string, number>> = new Map();
+
+    /**
+     * 解析帧的图像
+     *
+     * @memberof GIFEncoder
+     */
+    parseFramePixels(frame: Frame) {
+        const colorMap = new Map(this.colorMap);
+        const localColorMap = new Map();
+        let rgbPixels: number[] = [];
+        let globalRgbPixels: number[] = [];
+        let hasTransparenc = false;
+
+        for (let index = 0; index < frame.pixels.length; index += 4) {
+            const r = frame.pixels[index];
+            const g = frame.pixels[index + 1];
+            const b = frame.pixels[index + 2];
+            const a = frame.pixels[index + 3];
+            
+            if (a === 0 && !hasTransparenc) {
+                hasTransparenc = true;
+            } else {
+                const c = `${r},${g},${b}`;
+                if (!localColorMap.has(c)) { // XXX: 待优化
+                    const size = localColorMap.size;
+                    localColorMap.set(c, size);
+                    rgbPixels.push(r,g,b);
+                    if (!colorMap.has(c)) {
+                        const size = colorMap.size;
+                        colorMap.set(c, size);
+                        globalRgbPixels.push(r,g,b);
+                    }
+                }
             }
         }
-        if (this.transparencIndex !== undefined) {
-            const index = this.palette!.length;
-            this.transparencIndex = index / 3;
-            this.palette!.push(0, 0, 0);
-        }
 
-        while (this.palette!.length < (1 << this.colorDepth) * 3) {
-            this.palette!.push(0, 0, 0);
+        // 图像颜色数目超过256个需要减图片质量
+        if ((localColorMap.size + (hasTransparenc ? 1: 0)) > 256) { 
+            const nq = new NeuQuant(rgbPixels, { netsize: hasTransparenc ? 255 : 256, samplefac: 1 });
+            nq.buildColorMap();
+            rgbPixels = nq.getColorMap();
+            if (hasTransparenc) {
+                rgbPixels.push(0, 0, 0);
+                frame.transparentColorIndex = 255;
+            }
+            frame.isGlobalPalette = false;
+            frame.palette = rgbPixels;
+        } else if ((colorMap.size  + (this.hasTransparenc ? 1: 0)) > 256) { //全局颜色板不够放,放到局部
+            frame.isGlobalPalette = false;
+            this.localColorMap.set(frame, localColorMap);
+            frame.palette = rgbPixels;
+            if (hasTransparenc) {
+                frame.transparentColorIndex = rgbPixels.length;
+                rgbPixels.push(0, 0, 0);
+            }
+        } else {
+            this.colorMap = colorMap;
+            if (!frame.prevFrame) {
+                this.palette = rgbPixels;
+            } else {
+                this.palette.push(...globalRgbPixels);
+            }
+            if (hasTransparenc && this.transparencIndex === undefined) {
+                this.transparencIndex = this.palette.length;
+                this.palette.push(0, 0, 0);
+            }
+            frame.transparentColorIndex = this.transparencIndex;
+            frame.isGlobalPalette = true;
+            frame.palette = this.palette;
         }
     }
 
@@ -131,7 +228,7 @@ export default class GIFEncoder {
 
         otherFrams.forEach((frame, i) => {
             console.time(`generateFrameImageDatas frame ${i}`);
-            frame.imgData = [];
+            let imgData: number[] = [];
             const { x, y, w } = frame;
             let alphaList: number[] = [];
             for (let index = 0; index < frame.pixels.length; index += 4) {
@@ -144,10 +241,10 @@ export default class GIFEncoder {
                 const b2 = lastImageData[offset + 2];
                 const a = frame.pixels[index + 3];
                 if (r1 === r2 && g1 === g2 && b1 === b2) {
-                    frame.imgData.push(0, 0, 0, 0);
+                    imgData.push(0, 0, 0, 0);
                     alphaList.push(0);
                 }  else {
-                    frame.imgData.push(r1, g1, b1, a);
+                    imgData.push(r1, g1, b1, a);
                     lastImageData[offset] = r1;
                     lastImageData[offset + 1] = g1;
                     lastImageData[offset + 2] = b1;
@@ -155,10 +252,10 @@ export default class GIFEncoder {
                     alphaList.push(a);
                 }
             }
-            
+
             let top = Math.floor(alphaList.findIndex(v => v !== 0) / frame.w);
             if (top) {
-                frame.imgData.splice(0, top * frame.w * 4);
+                imgData.splice(0, top * frame.w * 4);
                 alphaList.splice(0, top * frame.w);
                 frame.y = top;
                 frame.h -= top;
@@ -168,7 +265,7 @@ export default class GIFEncoder {
             let bottom = Math.floor(alphaList.findIndex(v => v !== 0) / frame.w);
             if (bottom) {
                 alphaList.splice(-bottom * frame.w);
-                frame.imgData.splice(-bottom * frame.w * 4);
+                imgData.splice(-bottom * frame.w * 4);
                 frame.h -= bottom;
             }
             let left = 0;
@@ -191,7 +288,7 @@ export default class GIFEncoder {
                     break;
                 }
             }
-            frame.imgData = frame.imgData.filter((_, i) => {
+            imgData = imgData.filter((_, i) => {
                 const range = (Math.floor(i / 4) % frame.w);
                 if ((range < left || range >= (frame.w - right))) {
                     return false;
@@ -200,6 +297,8 @@ export default class GIFEncoder {
             })
             frame.x += left;
             frame.w -= (left + right);
+            frame.pixels = imgData;
+            if (frame.pixels.length === 0) debugger;
             console.timeEnd(`generateFrameImageDatas frame ${i}`);
         });
     }
@@ -215,26 +314,35 @@ export default class GIFEncoder {
         this.addCodes(this.numberToBytes(w));
         this.addCodes(this.numberToBytes(h));
 
-        let m = 1 << 7; // globalColorTableFlag
+        while (this.palette!.length < (1 << this.colorDepth) * 3) {
+            this.palette!.push(0, 0, 0);
+        }
+
+        let m = (this.palette.length ? 1 : 0) << 7; // globalColorTableFlag
         m += 0 << 4; // colorResolution
         m += 0 << 3; // sortFlag
-        m += Math.log2(this.palette!.length / 3) - 1; // sizeOfGlobalColorTable
+        m += this.palette.length ? this.colorDepth - 1 : 0; // sizeOfGlobalColorTable
         this.addCode(m);
         this.addCode(0); // backgroundColorIndex
         this.addCode(255); // pixelAspectRatio
-        this.addCodes(this.palette!);
+        if (this.palette.length) {
+            this.addCodes(this.palette);
+        }
     }
 
-    findClosest(r: number, g: number, b: number) {
-        if (!this.palette) throw new Error('缺少颜色');
-        if (this.neuQuant) {
+    findClosest(r: number, g: number, b: number, frame: Frame) {
+        const colorMap = this.localColorMap.get(frame);
+        const c = `${r},${g},${b}`;
+        if (colorMap) {
+            return colorMap.get(c)!;
+        } else if (!frame.isGlobalPalette) {
             let minpos = 0;
             let mind = 256 * 256 * 256;
 
-            for (let i = 0; i < this.palette.length; i += 3) {
-                const dr = r - this.palette[i];
-                const dg = g - this.palette[i + 1];
-                const db = b - this.palette[i + 2];
+            for (let i = 0; i < frame.palette.length; i += 3) {
+                const dr = r - frame.palette[i];
+                const dg = g - frame.palette[i + 1];
+                const db = b - frame.palette[i + 2];
                 const d = dr * dr + dg * dg + db * db;
                 const pos = (i / 3) | 0;
 
@@ -247,7 +355,6 @@ export default class GIFEncoder {
             }
             return minpos;
         }
-        const c = `${r},${g},${b}`;
         return this.colorMap.get(c)!;
     }
 
@@ -260,10 +367,10 @@ export default class GIFEncoder {
             let m = 0;
             m += 1 << 2; // sortFlag
             m += +frame.useInput << 1;
-            m += this.transparencIndex !== undefined ? 1 : 0;
+            m += frame.transparentColorIndex !== undefined ? 1 : 0;
             this.addCode(m);
             this.addCodes(this.numberToBytes(Math.floor(frame.delay / 10)));
-            this.addCode(this.transparencIndex || 0);
+            this.addCode(frame.transparentColorIndex || 0);
             this.addCode(0);
 
             // 2. image Descriptor
@@ -273,29 +380,39 @@ export default class GIFEncoder {
             this.addCodes(this.numberToBytes(frame.y));
             this.addCodes(this.numberToBytes(frame.w));
             this.addCodes(this.numberToBytes(frame.h));
-
             m = 0;
 
+            let colorDepth = this.colorDepth;
+            if (!frame.isGlobalPalette) {
+                const sizeOfColorTable = Math.ceil(Math.log2(frame.palette.length / 3)) - 1;
+                colorDepth = sizeOfColorTable + 1;
+                while (frame.palette!.length < (1 << colorDepth) * 3) {
+                    frame.palette!.push(0, 0, 0);
+                }
+                m = (1 << 7) | sizeOfColorTable;
+            }
             this.addCode(m);
-
+            if (!frame.isGlobalPalette) {
+                this.addCodes(frame.palette);
+            }
             // Image Data
-            this.addCode(this.colorDepth);
+            this.addCode(colorDepth);
+
             
             const indexs: number[] = [];
-            const imageData = frame.imgData;
+            const imageData = frame.pixels;
 
             for (let i = 0; i < imageData.length; i += 4) {
                 if (imageData[i + 3] === 0) {
-                    indexs.push(this.transparencIndex!);
+                    indexs.push(frame.transparentColorIndex!);
                 } else {
                     const r = imageData[i];
                     const g = imageData[i + 1];
                     const b = imageData[i + 2];
-                    indexs.push(this.findClosest(r, g, b));
+                    indexs.push(this.findClosest(r, g, b, frame));
                 }
             }
-
-            const encoder = new LzwEncoder(frame.w, frame.h, this.colorDepth);
+            const encoder = new LzwEncoder(frame.w, frame.h, colorDepth);
             const codes = Array.from(encoder.encode(indexs));
             let len = codes.length;
             while (len > 0) {

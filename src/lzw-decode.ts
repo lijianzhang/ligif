@@ -3,7 +3,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:20
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-19 20:27:24
+ * @Last Modified time: 2018-09-20 17:52:18
  */
  export default class LzwDecode {
     constructor(colorDepth: number) {

@@ -13,7 +13,8 @@ document.getElementById('main').addEventListener('drop', function (e) {
     const field = e.dataTransfer.files[0];
     const gif = new Gif();
     gif.readData(field).then(gif => {
-        gif.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+       gif.frames.forEach(f =>  document.body.appendChild(f.renderToCanvas().canvas));
+    //    gif.frames.forEach(f =>  document.body.this.appendChild(f.renderToCanvas().canvas));
         (window as any).gif = gif;
         setTimeout(() => {
             const gIFEncoder = new GIFEncoder();
@@ -25,7 +26,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
                     f.y = 0;
                     f.w = f.width;
                     f.h = f.height;
-                    f.delay = f.delay / 2;
+                    f.delay = f.delay;
                     f.pixels = Array.from(f.ctx.getImageData(0, 0, f.w, f.h).data);
                 }
             })
@@ -33,10 +34,10 @@ document.getElementById('main').addEventListener('drop', function (e) {
             const img = document.createElement('img');
             img.src = URL.createObjectURL(gIFEncoder.toBlob());
             document.body.appendChild(img);
-            // const b = new Gif();
-            // (window as any).b = b;
-            // b.readCodes(gIFEncoder.codes);
-            // b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+            const b = new Gif();
+            (window as any).b = b;
+            b.readCodes(gIFEncoder.codes);
+            b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
         })
 
     });

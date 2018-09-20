@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-16 00:10:40
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-20 00:07:11
+ * @Last Modified time: 2018-09-20 17:46:19
  */
 
 export interface IFrameOpiton {
@@ -15,8 +15,6 @@ export interface IFrameOpiton {
     w?: number;
     h?: number,
 }
-
-let ii = 0;
 
 const defaultOption = {
     displayType: 0,
@@ -51,14 +49,6 @@ export default class Frame {
     prevFrame?: Frame;
 
     /**
-     * 下一帧
-     *
-     * @type {Frame}
-     * @memberof Frame
-     */
-    nextFrame?: Frame;
-
-    /**
      * 帧图片x轴坐标
      *
      * @type {number}
@@ -91,7 +81,7 @@ export default class Frame {
     w: number = 0;
 
     /**
-     * 延迟多久后显示
+     * 延迟多久后显示,单位: ms
      *
      * @type {number}
      * @memberof Frame
@@ -99,7 +89,7 @@ export default class Frame {
     delay: number = 0;
 
     /**
-     *是非排序
+     * 是否排序 TODO: 目前没有实现
      *
      * @type {boolean}
      * @memberof Frame
@@ -121,6 +111,10 @@ export default class Frame {
      */
     palette: number[] = [];
 
+    /**
+     * 是否使用全局调色板
+     */
+    isGlobalPalette = false;
 
     /**
      * 透明颜色在调色板的索引
@@ -139,6 +133,9 @@ export default class Frame {
      */
     displayType: number = 0;
 
+    /**
+     * 原始数据
+     */
     imgData: number[] = [];
 
     /**
@@ -150,13 +147,16 @@ export default class Frame {
     useInput: boolean = false;
 
     /**
-     *像素
+     * 图片像素
      *
      * @type {number[]}
      * @memberof Frame
      */
     pixels!: number[];
 
+    /**
+     * 第一帧宽度
+     */
     get width() {
         if (this.prevFrame) {
             return this.prevFrame.width;
@@ -164,6 +164,9 @@ export default class Frame {
         return this.w;
     }
 
+    /**
+     * 第一帧高度
+     */
     get height() {
         if (this.prevFrame) {
             return this.prevFrame.height;
@@ -171,6 +174,9 @@ export default class Frame {
         return this.h;
     }
 
+    /**
+     * frame所对应的canvas上下文
+     */
     ctx?: CanvasRenderingContext2D;
 
     /**
@@ -194,7 +200,6 @@ export default class Frame {
         this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
 
         if ((this.displayType === 1 || this.displayType === 2) && this.prevFrame)  {
-            ii += 1;
             if (!this.prevFrame.ctx) this.prevFrame.renderToCanvas(retry);
                 imgData = this.ctx.getImageData(0, 0, this.width, this.height);
                 const prevImageData = this.prevFrame.ctx!.getImageData(0, 0, this.width, this.height);
