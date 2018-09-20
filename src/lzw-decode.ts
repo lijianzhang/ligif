@@ -3,8 +3,9 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:20
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-20 22:50:36
+ * @Last Modified time: 2018-09-21 00:51:03
  */
+
  export default class LzwDecode {
     constructor(colorDepth: number) {
         this.defaultColorSize = Math.max(2, colorDepth);
