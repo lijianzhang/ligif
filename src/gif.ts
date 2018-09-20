@@ -254,7 +254,7 @@ export default class Gif {
         const displayType = 0b111 & m >> 2;
         const useInput = !!(0b1 & m >> 1);
         const transparentColorFlag = !!(m & 0b1);
-        const delay = this.readOne() + (this.readOne() << 8);
+        const delay = (this.readOne() + (this.readOne() << 8)) * 10;
 
         const transparentColorIndex = this.readOne();
         this.currentOptions = {

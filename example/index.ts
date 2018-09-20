@@ -25,14 +25,18 @@ document.getElementById('main').addEventListener('drop', function (e) {
                     f.y = 0;
                     f.w = f.width;
                     f.h = f.height;
+                    f.delay = f.delay / 2;
                     f.pixels = Array.from(f.ctx.getImageData(0, 0, f.w, f.h).data);
                 }
             })
             gIFEncoder.generate();
-            const b = new Gif();
-            (window as any).b = b;
-            b.readCodes(gIFEncoder.codes);
-            b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(gIFEncoder.toBlob());
+            document.body.appendChild(img);
+            // const b = new Gif();
+            // (window as any).b = b;
+            // b.readCodes(gIFEncoder.codes);
+            // b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
         })
 
     });

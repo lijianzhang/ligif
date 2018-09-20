@@ -2,6 +2,8 @@ import Frame from './frame';
 import NeuQuant from './neuquant.js';
 import LzwEncoder from './lzw-encode';
 
+const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
+
 export default class GIFEncoder {
     private frames: Frame[] = [];
 
@@ -21,6 +23,7 @@ export default class GIFEncoder {
         this.writeFlag();
         this.generatePalette(samplefac, colorDepth);
         this.writeLogicalScreenDescriptor();
+        this.writeApplicationExtension();
         this.wirteFrames();
         this.addCode(0x3b);
     }
@@ -73,6 +76,7 @@ export default class GIFEncoder {
         const maxColorDepth = Math.ceil(Math.log2(pixels.length / 3));
 
         this.colorDepth = Math.min(colorDepth, maxColorDepth);
+
         if (pixels.length / 3 > 255) {
             this.neuQuant = new NeuQuant(pixels, { netsize: (1 << this.colorDepth) - 1, samplefac }); // 减1保留透明色位置
             this.neuQuant.buildColorMap();
@@ -125,7 +129,8 @@ export default class GIFEncoder {
         let lastImageData = [...firstFrame.pixels];
         firstFrame.imgData = firstFrame.pixels; 
 
-        otherFrams.forEach((frame) => {
+        otherFrams.forEach((frame, i) => {
+            console.time(`generateFrameImageDatas frame ${i}`);
             frame.imgData = [];
             const { x, y, w } = frame;
             let alphaList: number[] = [];
@@ -194,7 +199,8 @@ export default class GIFEncoder {
                 return true;
             })
             frame.x += left;
-            frame.w -= (left + right)
+            frame.w -= (left + right);
+            console.timeEnd(`generateFrameImageDatas frame ${i}`);
         });
     }
 
@@ -252,11 +258,11 @@ export default class GIFEncoder {
             this.addCode(0xf9); // al
             this.addCode(4); // byte size
             let m = 0;
-            m += 1 << 3; // sortFlag
+            m += 1 << 2; // sortFlag
             m += +frame.useInput << 1;
             m += this.transparencIndex !== undefined ? 1 : 0;
             this.addCode(m);
-            this.addCodes(this.numberToBytes(frame.delay));
+            this.addCodes(this.numberToBytes(Math.floor(frame.delay / 10)));
             this.addCode(this.transparencIndex || 0);
             this.addCode(0);
 
@@ -299,5 +305,24 @@ export default class GIFEncoder {
             }
             this.addCode(0);
         });
+    }
+
+    private writeApplicationExtension() {
+        this.addCode(0x21);        
+        this.addCode(255);
+        this.addCode(11);
+        this.addCodes(NETSCAPE2_0);
+        this.addCode(3);
+        this.addCode(1);
+        this.addCode(0);
+        this.addCode(0);
+        this.addCode(0);
+    }
+
+    toBlob() {
+        const array = new ArrayBuffer(this.codes.length);
+        const view = new DataView(array);
+        this.codes.forEach((v, i) => view.setUint8(i, v));
+        return new Blob([view], {type: "image/png"});
     }
 }
