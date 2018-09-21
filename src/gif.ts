@@ -2,10 +2,11 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-20 22:51:03
+ * @Last Modified time: 2018-09-21 23:38:36
  */
 import Frame, { IFrameOpiton } from './frame';
-import LzwDecode from './lzw-decode';
+import './lzw-decode';
+import workPool from './work';
 
 const CONSTANT_FALG = {
     imageDescriptor: 0x2C, //44
@@ -29,16 +30,14 @@ export default class Gif {
     async readData(data: Blob) {
         this.fieldReader = new FileReader();
         this.fieldReader.readAsArrayBuffer(data);
-        return new Promise(res => {
-            this.fieldReader.onload = () => {
-                this.onLoad(new Uint8Array(this.fieldReader.result as ArrayBuffer));
-                res(this);
-            }
-        }) as Promise<this>;
+        await new Promise(res => this.fieldReader.onload = () => {res();});
+        await this.onLoad(new Uint8Array(this.fieldReader.result as ArrayBuffer));
+        return this;
     }
 
-    readCodes(data: number[]) {
-        this.onLoad(data);
+    async readCodes(data: number[]) {
+        await this.onLoad(data);
+        return this;
     }
 
     private fieldReader!: FileReader;
@@ -47,7 +46,8 @@ export default class Gif {
 
     private currentOptions?: IFrameOpiton;
 
-    private onLoad(dataSource: number[] | Uint8Array) {
+    private async onLoad(dataSource: number[] | Uint8Array) {
+        console.group('decoder gif')
         this.dataSource = new Uint8Array(dataSource);
         this.readHeader();
         this.readLogicalScreenDescriptor();
@@ -56,10 +56,14 @@ export default class Gif {
             const len =  2 ** (this.colorDepth + 1) * 3;
             this.palette = this.readColorTable(len);
         }
-
-        while (!this.loaded) {
+        while(!this.loaded) {
             this.readExtension();
         }
+
+        console.time('parsePixels');
+        await this.parsePixels();
+        console.timeEnd('parsePixels');
+        console.groupEnd();
         if (this.next) this.next(this);
     }
 
@@ -149,6 +153,10 @@ export default class Gif {
 
 
     version!: string;
+
+    async parsePixels() {
+        await Promise.all(this.frames.map(f => this.decodeToPixels(f)));
+    }
 
     private read(len = 1) {
         return this.dataSource.slice(this.offset, this.offset += len);
@@ -289,7 +297,7 @@ export default class Gif {
         } else {
             frame.palette = this.palette;
         }
-        const colorDepth = this.readOne();
+        this.readOne();
         // 解析图像数据
         let data: number[] = []
         while (true) {
@@ -297,7 +305,8 @@ export default class Gif {
             if (len) {
                 this.read(len).forEach(v => data.push(v));
             } else {
-                this.decodeToPixels(frame, data, colorDepth);
+                frame.imgData = data;
+                // await this.decodeToPixels(frame, data, colorDepth);
                 break;
             }
         }
@@ -305,12 +314,10 @@ export default class Gif {
 
     }
 
-    decodeToPixels(frame: Frame, data: number[], colorDepth: number) {
-        const decoder = new LzwDecode(colorDepth);
+    async decodeToPixels(frame: Frame) {
+        const colorDepth = Math.log2(frame.palette.length / 3);
+        const data = await workPool.executeWork('decode', [colorDepth, frame.imgData]);
         frame.pixels = [];
-        console.time('decode gif');
-        console.log('data len', data.length);
-        data = decoder.decode(new Uint8Array(data));
         if (!frame.isInterlace) {
             data.forEach((k) => {
                 frame.pixels.push(frame.palette[k * 3]);
@@ -336,7 +343,7 @@ export default class Gif {
                 }
             }
         }
-        console.timeEnd('decode gif');
+        // frame.imgData = [];
     }
 
     private readPlainTextExtension() {

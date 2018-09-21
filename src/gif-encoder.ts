@@ -1,6 +1,7 @@
-import Frame from './frame';
+import Frame, { IFrame } from './frame';
 import NeuQuant from './neuquant.js';
-import LzwEncoder from './lzw-encode';
+import './lzw-encode';
+import workPool from './work';
 
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 
@@ -9,23 +10,34 @@ export default class GIFEncoder {
 
     public codes: number[] = [];
 
-    addFrame(frame: Frame) {
+    addFrame(frame: IFrame) {
         const preFrame = this.frames[this.frames.length - 1];
-        frame.prevFrame = preFrame;
-        this.frames.push(frame);
+        if (frame instanceof Frame) {
+            frame = frame.toData();
+        }
+        const f = new Frame(frame);
+        f.prevFrame = preFrame;
+        this.frames.push(f);
     }
 
     addFrames(frames: Frame[]) {
         frames.forEach(frame => this.addFrame(frame));
     }
 
-    generate(samplefac?: number, colorDepth?: number) {
+    async generate(samplefac?: number, colorDepth?: number) {
+        console.group('generate gif')
+        console.time('generate time')
         this.writeFlag();
-        this.generatePalette(samplefac, colorDepth);
+        await this.generatePalette(samplefac, colorDepth);
         this.writeLogicalScreenDescriptor();
         this.writeApplicationExtension();
-        this.wirteFrames();
+        console.time('wirteFrames');
+        await this.wirteFrames();
+        console.timeEnd('wirteFrames');
         this.addCode(0x3b);
+        console.timeEnd('generate time')
+        console.groupEnd()
+
     }
 
     private strTocode(str: string) {
@@ -37,7 +49,7 @@ export default class GIFEncoder {
     }
 
     addCodes(codes: number[]) {
-        this.codes.push(...codes);
+        this.codes = this.codes.concat(codes);
     }
     addCode(code: number) {
         this.codes.push(code);
@@ -71,9 +83,10 @@ export default class GIFEncoder {
      * @param {number} [colorDepth=8]
      * @memberof GIFEncoder
      */
-    generatePalette(samplefac: number = 10, colorDepth: number = 8) {
+    async generatePalette(samplefac: number = 10, colorDepth: number = 8) {
         console.time('generateFrameImageDatas');
-        this.generateFrameImageDatas(this.frames);
+        workPool.registerWork('generateImageDatas', this.generateImageDatas);
+        await workPool.executeWork('generateImageDatas', [this.frames]);
         console.timeEnd('generateFrameImageDatas');
 
         console.time('parseFramePixels');
@@ -174,10 +187,9 @@ export default class GIFEncoder {
      * @param {Frame[]} frames
      * @memberof GIFEncoder
      */
-    generateFrameImageDatas(frames: Frame[]) {
+    generateImageDatas(frames: Frame[]) {
         const [firstFrame, ...otherFrams] = frames;
         let lastImageData = [...firstFrame.pixels];
-
         otherFrams.forEach((frame, i) => {
             let imgData: number[] = [];
             const { x, y, w } = frame;
@@ -311,28 +323,30 @@ export default class GIFEncoder {
         return this.colorMap.get(c)!;
     }
 
-    wirteFrames() {
-        this.frames.forEach((frame) => {
+    async wirteFrames() {
+        const frames = this.frames.filter(f => f.w && f.h);
+        const codesArray = await Promise.all(frames.map(async (frame) => {
+            let codes:number[] = [];
             // 1. Graphics Control Extension
-            this.addCode(0x21); // exc flag
-            this.addCode(0xf9); // al
-            this.addCode(4); // byte size
+            codes.push(0x21); // exc flag
+            codes.push(0xf9); // al
+            codes.push(4); // byte size
             let m = 0;
             m += 1 << 2; // sortFlag
             m += +frame.useInput << 1;
             m += frame.transparentColorIndex !== undefined ? 1 : 0;
-            this.addCode(m);
-            this.addCodes(this.numberToBytes(Math.floor(frame.delay / 10)));
-            this.addCode(frame.transparentColorIndex || 0);
-            this.addCode(0);
+            codes.push(m);
+            codes.push(...this.numberToBytes(Math.floor(frame.delay / 10)));
+            codes.push(frame.transparentColorIndex || 0);
+            codes.push(0);
 
             // 2. image Descriptor
-            this.addCode(0x2c);
+            codes.push(0x2c);
 
-            this.addCodes(this.numberToBytes(frame.x));
-            this.addCodes(this.numberToBytes(frame.y));
-            this.addCodes(this.numberToBytes(frame.w));
-            this.addCodes(this.numberToBytes(frame.h));
+            codes.push(...this.numberToBytes(frame.x));
+            codes.push(...this.numberToBytes(frame.y));
+            codes.push(...this.numberToBytes(frame.w));
+            codes.push(...this.numberToBytes(frame.h));
             m = 0;
 
             let colorDepth = this.colorDepth;
@@ -344,12 +358,12 @@ export default class GIFEncoder {
                 }
                 m = (1 << 7) | sizeOfColorTable;
             }
-            this.addCode(m);
+            codes.push(m);
             if (!frame.isGlobalPalette) {
-                this.addCodes(frame.palette);
+                codes.push(...frame.palette);
             }
             // Image Data
-            this.addCode(colorDepth);
+            codes.push(colorDepth);
 
             
             const indexs: number[] = [];
@@ -366,16 +380,17 @@ export default class GIFEncoder {
                 }
             }
 
-            const encoder = new LzwEncoder(frame.w, frame.h, colorDepth);
-            const codes = Array.from(encoder.encode(indexs));
-            let len = codes.length;
+            const data = await workPool.executeWork('encode', [frame.w, frame.h, colorDepth, indexs]);
+            let len = data.length;
             while (len > 0) {
-                this.addCode(Math.min(len, 0xFF));
-                this.addCodes(codes.splice(0, 0xFF));
+                codes.push(Math.min(len, 0xFF));
+                codes = codes.concat(data.splice(0, 0xFF))
                 len -= 255;
             }
-            this.addCode(0);
-        });
+            codes.push(0);
+            return codes;
+        }));
+        codesArray.forEach(codes => this.addCodes(codes));
     }
 
     private writeApplicationExtension() {

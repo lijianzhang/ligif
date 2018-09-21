@@ -2,9 +2,8 @@
  * @Author: lijianzhang
  * @Date: 2018-09-16 00:10:40
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-20 23:52:44
+ * @Last Modified time: 2018-09-21 22:26:01
  */
-let ii = 0;
 export interface IFrameOpiton {
     displayType?: number;
     useInput?: boolean;
@@ -14,6 +13,17 @@ export interface IFrameOpiton {
     y?: number;
     w?: number;
     h?: number,
+    pixels?: number[];
+}
+
+export interface IFrame {
+    useInput?: boolean;
+    delay: number;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    pixels: number[];
 }
 
 const defaultOption = {
@@ -24,10 +34,13 @@ const defaultOption = {
     y: 0,
     w: 0,
     h: 0,
-} as Required<IFrameOpiton>;
+    pixels: [],
+    transparentColorIndex: undefined,
+};
+
 export default class Frame {
     constructor(option?: IFrameOpiton) {
-        const o = option ? Object.assign({}, defaultOption, option) : defaultOption;
+        const o = option ? Object.assign({ transparentColorIndex: undefined }, defaultOption, option) : defaultOption;
 
         this.displayType = o.displayType;
         this.useInput = o.useInput;
@@ -37,6 +50,7 @@ export default class Frame {
         this.y = o.y;
         this.h = o.h;
         this.w = o.w;
+        this.pixels = o.pixels;
     }
 
     /**
@@ -151,7 +165,7 @@ export default class Frame {
      * @type {number[]}
      * @memberof Frame
      */
-    pixels!: number[];
+    pixels: number[];
 
     /**
      * 第一帧宽度
@@ -177,6 +191,17 @@ export default class Frame {
      * frame所对应的canvas上下文
      */
     ctx?: CanvasRenderingContext2D;
+
+    toData(): IFrame {
+        return {
+            x: this.x,
+            y: this.y,
+            w: this.w,
+            h: this.h,
+            pixels: this.pixels,
+            delay: this.delay,
+        };
+    }
 
     /**
      * 将图片数据渲染到canvas
