@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-21 23:38:36
+ * @Last Modified time: 2018-09-22 01:13:33
  */
 import Frame, { IFrameOpiton } from './frame';
 import './lzw-decode';
@@ -279,9 +279,8 @@ export default class Gif {
         const option = this.currentOptions || {};
         const frame = new Frame(option);
         frame.prevFrame = this.frames[this.frames.length - 1];
-        this.frames.push(frame);
         this.currentOptions = undefined;
-
+        
         frame.x = this.readOne() + (this.readOne() << 8);
         frame.y = this.readOne() + (this.readOne() << 8);
         frame.w = this.readOne() + (this.readOne() << 8);
@@ -310,7 +309,7 @@ export default class Gif {
                 break;
             }
         }
-
+        if (frame.w && frame.h) this.frames.push(frame);
 
     }
 
