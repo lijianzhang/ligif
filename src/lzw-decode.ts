@@ -3,9 +3,10 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:20
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-22 09:40:35
+ * @Last Modified time: 2018-09-23 14:08:44
  */
 import workPool from './work';
+
 
 workPool.registerWork('decode', (colorDepth: number, buffer: number[] | Uint8Array) => {
     class LzwDecode {
@@ -101,6 +102,7 @@ workPool.registerWork('decode', (colorDepth: number, buffer: number[] | Uint8Arr
                     }
                 } else {
                     if (code !== this.dict.size) {
+                        debugger;
                         throw new Error('无效的图形数据');
                     }
     
@@ -121,3 +123,10 @@ workPool.registerWork('decode', (colorDepth: number, buffer: number[] | Uint8Arr
      const decode = new LzwDecode(colorDepth);
      return decode.decode(buffer);
 })
+
+
+// function decode(colorDepth: number, buffer: Uint8Array) {
+//     const defaultColorSize = colorDepth;
+
+//     let colorSize = colorDepth += 1;
+// }

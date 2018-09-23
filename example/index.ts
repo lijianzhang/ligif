@@ -31,15 +31,16 @@ document.getElementById('main').addEventListener('drop', function (e) {
             })
             console.time('generate');
             gIFEncoder.generate().then(() => {
+                console.log('toBlob', gIFEncoder.codes)
                 console.timeEnd('generate');
                 const img = document.createElement('img');
                 img.src = URL.createObjectURL(gIFEncoder.toBlob());
                 document.body.appendChild(img);
-                // const b = new Gif();
-                // (window as any).b = b;
-                // b.readCodes(gIFEncoder.codes).then(() => {
-                //     b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
-                // })
+                const b = new Gif();
+                (window as any).b = b;
+                b.readCodes(gIFEncoder.codes).then(() => {
+                    b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+                })
             });
         })
 
@@ -66,6 +67,7 @@ setTimeout(() => {
     const encoder = new GIFEncoder();
     encoder.addFrame(frame);
     encoder.generate().then(() => {
+        console.log('toBlob', encoder.codes)
         const decoder = new Gif();
         decoder.readCodes(encoder.codes).then(() => {
             decoder.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));

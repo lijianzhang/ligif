@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-22 01:13:33
+ * @Last Modified time: 2018-09-23 15:26:00
  */
 import Frame, { IFrameOpiton } from './frame';
 import './lzw-decode';
@@ -296,9 +296,11 @@ export default class Gif {
         } else {
             frame.palette = this.palette;
         }
-        this.readOne();
+
+        frame.colorDepth = this.readOne();
         // 解析图像数据
         let data: number[] = []
+
         while (true) {
             let len = this.readOne();
             if (len) {
@@ -314,8 +316,8 @@ export default class Gif {
     }
 
     async decodeToPixels(frame: Frame) {
-        const colorDepth = Math.log2(frame.palette.length / 3);
-        const data = await workPool.executeWork('decode', [colorDepth, frame.imgData]);
+        // const colorDepth = Math.log2(frame.palette.length / 3);
+        const data = await workPool.executeWork('decode', [frame.colorDepth, frame.imgData]);
         frame.pixels = [];
         if (!frame.isInterlace) {
             data.forEach((k) => {

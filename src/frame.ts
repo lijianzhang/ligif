@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-16 00:10:40
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-21 22:26:01
+ * @Last Modified time: 2018-09-23 14:17:57
  */
 export interface IFrameOpiton {
     displayType?: number;
@@ -158,6 +158,8 @@ export default class Frame {
      * @memberof Frame
      */
     useInput: boolean = false;
+
+    colorDepth = 8;
 
     /**
      * 图片像素

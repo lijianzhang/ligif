@@ -2,6 +2,7 @@ import Frame, { IFrame } from './frame';
 import NeuQuant from './neuquant.js';
 import './lzw-encode';
 import workPool from './work';
+import encoder from './encoder';
 
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 
@@ -118,18 +119,22 @@ export default class GIFEncoder {
     }
 
     async generate(samplefac?: number, colorDepth?: number) {
-        console.group('generate gif');
-        console.time('generate time');
-        this.writeFlag();
-        await this.generatePalette();
-        this.writeLogicalScreenDescriptor();
-        this.writeApplicationExtension();
-        console.time('wirteFrames');
-        await this.wirteFrames();
-        console.timeEnd('wirteFrames');
-        this.addCode(0x3b);
-        console.timeEnd('generate time');
-        console.groupEnd();
+        console.time('new generate time');
+        this.codes = await encoder(this.frames);
+        console.timeEnd('new generate time');
+
+        // console.group('generate gif');
+        // console.time('generate time');
+        // this.writeFlag();
+        // await this.generatePalette();
+        // this.writeLogicalScreenDescriptor();
+        // this.writeApplicationExtension();
+        // console.time('wirteFrames');
+        // await this.wirteFrames();
+        // console.timeEnd('wirteFrames');
+        // this.addCode(0x3b);
+        // console.timeEnd('generate time');
+        // console.groupEnd();
     }
 
     private strTocode(str: string) {
@@ -389,13 +394,13 @@ export default class GIFEncoder {
                         indexs.push(this.findClosest(r, g, b, frame));
                     }
                 }
-
+                const buffer = Uint8Array.from(indexs);
                 const data = await workPool.executeWork('encode', [
                     frame.w,
                     frame.h,
                     colorDepth,
-                    indexs,
-                ]);
+                    buffer.buffer,
+                ], [buffer.buffer]);
                 let len = data.length;
                 while (len > 0) {
                     codes.push(Math.min(len, 0xff));
