@@ -430,6 +430,6 @@ export default class GIFEncoder {
         const array = new ArrayBuffer(this.codes.length);
         const view = new DataView(array);
         this.codes.forEach((v, i) => view.setUint8(i, v));
-        return new Blob([view], { type: 'image/png' });
+        return new Blob([view], { type: 'image/gif' });
     }
 }

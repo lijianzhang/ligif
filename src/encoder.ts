@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-23 15:33:38
+ * @Last Modified time: 2018-09-23 16:04:06
  */
 
 import NeuQuant from './neuquant.js';
@@ -382,18 +382,9 @@ function strTocode(str: string) {
 
 export default async function encoder(frames: IImageInfo[]) {
 
-    let imgDatas = optimizeImagePixels(
-        frames.map(f => transformFrameToImageData(f)),
-    );
+    let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToImageData(f)));
 
-    imgDatas = imgDatas.map(d => decreasePalette(d));
-
-    console.time('parseFramePalette');
-    imgDatas = parseFramePalette(imgDatas);
-    console.timeEnd('parseFramePalette');
-    console.time('encodeFramePixels');
-    imgDatas = await encodeFramePixels(imgDatas);
-    console.timeEnd('encodeFramePixels');
+    imgDatas = await encodeFramePixels(parseFramePalette(imgDatas.map(d => decreasePalette(d))));
 
     const codes: number[] = [];
     
