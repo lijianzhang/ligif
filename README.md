@@ -1,12 +1,14 @@
 # LIGIF
 
-### 支持直接在浏览器生产和解析GIF图片的工具库
+支持直接在浏览器生产和解析GIF图片的工具库
 
 ### 参考资料
 * 文件格式: [3MF Project: What’s In A GIF - Bit by Byte](http://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp)
 
+### Demo
+[example](hhttps://lijianzhang.github.io/ligif/example/index.html)
 
-### install
+### Installation
 
 ```bash
 yarn add ligif
@@ -18,7 +20,7 @@ or
 npm i -S ligif
 ```
 
-### example
+### Usage
 
 **生成gif**
 

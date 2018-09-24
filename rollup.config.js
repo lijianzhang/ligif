@@ -1,9 +1,8 @@
 import nodeResolve from 'rollup-plugin-node-resolve';
-import typescript from 'typescript';
-import replace from 'rollup-plugin-replace';
 import commonjs from 'rollup-plugin-commonjs';
 import uglify from 'rollup-plugin-uglify';
-import rollupTypescript from 'rollup-plugin-typescript';
+import typescript from 'rollup-plugin-typescript2';
+
 
 const env = process.env.NODE_ENV;
 
@@ -15,7 +14,7 @@ const config = {
     },
     plugins: [
         nodeResolve(),
-        rollupTypescript({ typescript, importHelpers: true }),
+        typescript(),
         replace({
             'process.env.NODE_ENV': JSON.stringify(env),
         }),

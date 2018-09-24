@@ -5,8 +5,7 @@
     "moduleResolution": "node",
     "newLine": "LF",
     "outDir": "./es",
-    "target": "es5",
-    "declaration": true,
+    "target": "es6",
     "sourceMap": false,
     "lib": ["dom", "esnext"],
     "noUnusedLocals": true,
@@ -20,6 +19,7 @@
   },
   "include": [
     "src/**/*",
+    "example/**/*"
   ],
   "exclude": [
     ".git",
