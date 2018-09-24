@@ -6,7 +6,7 @@
 * 文件格式: [3MF Project: What’s In A GIF - Bit by Byte](http://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp)
 
 ### Demo
-[example](hhttps://lijianzhang.github.io/ligif/example/index.html)
+[example](https://lijianzhang.github.io/ligif/example/index.html)
 
 ### Installation
 
