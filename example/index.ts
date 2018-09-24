@@ -9,7 +9,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
     gif.readData(field).then(gif => {
        gif.frames.forEach(f =>  f.renderToCanvas().canvas);
         setTimeout(() => {
-            const gIFEncoder = new GIFEncoder(gif.frames[0].w, gif.frames[0].h);
+            const gIFEncoder = new GIFEncoder(gif.frames[0].w, gif.frames[0].h, 1);
             gIFEncoder.addFrames(gif.frames);
 
 
@@ -36,10 +36,10 @@ const img1 = document.getElementById('img1') as HTMLImageElement;
 const img2 = document.getElementById('img2') as HTMLImageElement;
 const img3 = document.getElementById('img3') as HTMLImageElement;
 
-const encoder = new GIFEncoder(img1.width, img1.height);
-encoder.addFrame({ img: img1 });
-encoder.addFrame({ img: img2 });
-encoder.addFrame({ img: img3 });
+const encoder = new GIFEncoder(img1.width, img1.height, 10);
+encoder.addFrame({ img: img1, delay: 1000 });
+encoder.addFrame({ img: img2, delay: 1000 });
+encoder.addFrame({ img: img3, delay: 1000 });
 
 encoder.encode().then(() => {
     const img = document.createElement('img');

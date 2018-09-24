@@ -69,7 +69,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
 - [ ] 增加进度控制
 - [ ] 耗时操作都改为worker
 - [ ] 增加对video支持
-- [ ] 支持控制循环次数
+- [x] 支持控制循环次数
 - [ ] 支持有损压缩
 
 ### License

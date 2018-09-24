@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 21:05:15
+ * @Last Modified time: 2018-09-25 00:38:02
  */
 
 import NeuQuant from './neuquant';
@@ -370,7 +370,7 @@ function strTocode(str: string) {
     return str.split('').map(s => s.charCodeAt(0));
 }
 
-export default async function encoder(frames: IFrame[]) {
+export default async function encoder(frames: IFrame[], time: number = 0) {
 
     let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToFrameData(f)));
 
@@ -395,17 +395,19 @@ export default async function encoder(frames: IFrame[]) {
     codes.push(0); // backgroundColorIndex
     codes.push(255); // pixelAspectRatio
     codes.push(...globalPalette);
+    if (time !== 1) {
+        // writeApplicationExtension
+        codes.push(0x21);
+        codes.push(255);
+        codes.push(11);
+        codes.push(...NETSCAPE2_0);
+        codes.push(3);
+        codes.push(1);
+        codes.push((time > 1 ? time - 1 : 0) & 255);
+        codes.push((time > 1 ? time - 1 : 0) >> 8);
+        codes.push(0);
+    }
 
-    // writeApplicationExtension
-    codes.push(0x21);
-    codes.push(255);
-    codes.push(11);
-    codes.push(...NETSCAPE2_0);
-    codes.push(3);
-    codes.push(1);
-    codes.push(0);
-    codes.push(0);
-    codes.push(0);
     imgDatas.filter(data => data.w && data.h).forEach((data) => {
         // 1. Graphics Control Extension
         codes.push(0x21); // exc flag

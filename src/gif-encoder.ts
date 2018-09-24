@@ -25,13 +25,23 @@ export interface IImageData {
 
 export default class GifEncoder {
 
-    constructor(w: number, h: number) {
+    /**
+     *
+     * @param {number} w
+     * @param {number} h
+     * @param {number} [time=0] //如果0表示将一直循环
+     * @memberof GifEncoder
+     */
+    constructor(w: number, h: number, time = 0) {
         this.w = w;
         this.h = h;
+        this.time = time;
     }
 
     private w: number;
     private h: number;
+
+    private time: number;
 
     private frames: IImageData[] = [];
 
@@ -61,7 +71,7 @@ export default class GifEncoder {
     }
 
     async encode() {
-        const codes = await encoder(this.frames);
+        const codes = await encoder(this.frames, this.time);
         this.codes = codes;
     }
 

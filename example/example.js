@@ -1021,7 +1021,7 @@ workPool.registerWork('encode', (width, height, colorDepth, codes) => {
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 21:05:15
+ * @Last Modified time: 2018-09-25 00:38:02
  */
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 /**
@@ -1324,7 +1324,7 @@ function decreasePalette(frameData, colorDepth = 8) {
 function strTocode(str) {
     return str.split('').map(s => s.charCodeAt(0));
 }
-function encoder(frames) {
+function encoder(frames, time = 0) {
     return __awaiter(this, void 0, void 0, function* () {
         let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToFrameData(f)));
         imgDatas = yield encodeFramePixels(parseFramePalette(imgDatas.map(d => decreasePalette(d))));
@@ -1343,16 +1343,18 @@ function encoder(frames) {
         codes.push(0); // backgroundColorIndex
         codes.push(255); // pixelAspectRatio
         codes.push(...globalPalette);
-        // writeApplicationExtension
-        codes.push(0x21);
-        codes.push(255);
-        codes.push(11);
-        codes.push(...NETSCAPE2_0);
-        codes.push(3);
-        codes.push(1);
-        codes.push(0);
-        codes.push(0);
-        codes.push(0);
+        if (time !== 1) {
+            // writeApplicationExtension
+            codes.push(0x21);
+            codes.push(255);
+            codes.push(11);
+            codes.push(...NETSCAPE2_0);
+            codes.push(3);
+            codes.push(1);
+            codes.push((time > 1 ? time - 1 : 0) & 255);
+            codes.push((time > 1 ? time - 1 : 0) >> 8);
+            codes.push(0);
+        }
         imgDatas.filter(data => data.w && data.h).forEach((data) => {
             // 1. Graphics Control Extension
             codes.push(0x21); // exc flag
@@ -1408,11 +1410,19 @@ function encoder(frames) {
 }
 
 class GifEncoder {
-    constructor(w, h) {
+    /**
+     *
+     * @param {number} w
+     * @param {number} h
+     * @param {number} [time=0] //如果0表示将一直循环
+     * @memberof GifEncoder
+     */
+    constructor(w, h, time = 0) {
         this.frames = [];
         this.codes = [];
         this.w = w;
         this.h = h;
+        this.time = time;
     }
     addFrame(frame) {
         let data;
@@ -1437,7 +1447,7 @@ class GifEncoder {
     }
     encode() {
         return __awaiter(this, void 0, void 0, function* () {
-            const codes = yield encoder(this.frames);
+            const codes = yield encoder(this.frames, this.time);
             this.codes = codes;
         });
     }
@@ -1470,7 +1480,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
     gif.readData(field).then(gif => {
         gif.frames.forEach(f => f.renderToCanvas().canvas);
         setTimeout(() => {
-            const gIFEncoder = new GifEncoder(gif.frames[0].w, gif.frames[0].h);
+            const gIFEncoder = new GifEncoder(gif.frames[0].w, gif.frames[0].h, 1);
             gIFEncoder.addFrames(gif.frames);
             gIFEncoder.encode().then(() => {
                 const img = document.createElement('img');
@@ -1491,10 +1501,10 @@ document.getElementById('main').addEventListener('dragover', function (e) {
 const img1 = document.getElementById('img1');
 const img2 = document.getElementById('img2');
 const img3 = document.getElementById('img3');
-const encoder$1 = new GifEncoder(img1.width, img1.height);
-encoder$1.addFrame({ img: img1 });
-encoder$1.addFrame({ img: img2 });
-encoder$1.addFrame({ img: img3 });
+const encoder$1 = new GifEncoder(img1.width, img1.height, 10);
+encoder$1.addFrame({ img: img1, delay: 1000 });
+encoder$1.addFrame({ img: img2, delay: 1000 });
+encoder$1.addFrame({ img: img3, delay: 1000 });
 encoder$1.encode().then(() => {
     const img = document.createElement('img');
     img.src = URL.createObjectURL(encoder$1.toBlob());
