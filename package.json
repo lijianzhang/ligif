@@ -1,6 +1,6 @@
 {
   "name": "ligif",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "tool library for gif",
   "main": "lib/index.js",
   "module": "es/index.js",
@@ -14,7 +14,11 @@
     "clear": "rm -rf dist & rm -rf es & rm -rf lib",
     "prepublish": "npm run build"
   },
-  "keywords": ["gif", "ecnode", "decode"],
+  "keywords": [
+    "gif",
+    "ecnode",
+    "decode"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
