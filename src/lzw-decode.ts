@@ -3,7 +3,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:20
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-23 14:08:44
+ * @Last Modified time: 2018-09-24 16:27:58
  */
 import workPool from './work';
 
@@ -123,10 +123,3 @@ workPool.registerWork('decode', (colorDepth: number, buffer: number[] | Uint8Arr
      const decode = new LzwDecode(colorDepth);
      return decode.decode(buffer);
 })
-
-
-// function decode(colorDepth: number, buffer: Uint8Array) {
-//     const defaultColorSize = colorDepth;
-
-//     let colorSize = colorDepth += 1;
-// }

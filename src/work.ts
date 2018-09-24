@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-21 00:28:46
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-23 15:19:11
+ * @Last Modified time: 2018-09-24 16:35:19
  */
 
 class WorkPool {
@@ -71,6 +71,7 @@ class WorkPool {
     }
 
     private completeHandle<T>(work: Worker, args: any[], transferable?: any[], res?: Function, rej?: Function) {
+        work.postMessage(args, transferable);
         if (res && rej) {
             work.onmessage = (v) =>  {
                 res(v.data)
@@ -80,7 +81,6 @@ class WorkPool {
                 rej(e.message);
                 this.stopWork(work)
             }
-            work.postMessage(args, transferable);
             return work;
         } else {
             return new Promise<T>((res, rej) => {
@@ -92,7 +92,6 @@ class WorkPool {
                     rej(e.message);
                     this.stopWork(work)
                 }
-                work.postMessage(args, transferable);
             })
         }
     }
@@ -100,29 +99,4 @@ class WorkPool {
 
 const workPool = new WorkPool();
 
-(window as any).workPool = workPool;
-
 export default workPool;
-
-// export default function work<T>(fn: Function | Blob) {
-//     let blob: Blob;
-//     if (fn instanceof Blob) {
-//         blob = fn;
-//     } else {
-//         var str = "onmessage=function(e){postMessage(" + fn + "(e.data))}";
-//         blob = new Blob([str], { type: 'application/javascript' });
-//     }
-
-//     const work = new Worker(URL.createObjectURL(blob));
-
-//     return (message: any) => {
-//         work.postMessage(message);
-//         return new Promise<T>((res, rej) => {
-//             work.onmessage = (v) =>  {
-//                 res(v.data)
-//                 work.terminate();
-//             };
-//             work.onerror = (e) => rej(e.message);
-//         })
-//     }
-// }

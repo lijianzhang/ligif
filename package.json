@@ -3,14 +3,28 @@
   "version": "1.0.0",
   "description": "",
   "main": "example/index.js",
+  "module": "es/index.js",
   "private": true,
   "scripts": {
-    "start": "parcel  serve example/index.html"
+    "start": "parcel  serve example/index.html",
+    "build:commonjs": "tsc -m commonjs --outdir lib",
+    "build:es": "tsc",
+    "build:umd": "NODE_ENV=development rollup -c -o dist/liob.js",
+    "build:umd:min": "NODE_ENV=production rollup -c -o dist/liob.min.js",
+    "build": "npm run clear && npm run build:commonjs && npm run build:es && npm run build:umd && npm run build:umd:min",
+    "clear": "rm -rf dist & rm -rf es & rm -rf lib",
+    "prepublish": "npm run build"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "typescript": "^3.0.3"
+    "typescript": "^3.0.3",
+    "rollup": "^0.56.5",
+    "rollup-plugin-commonjs": "^9.0.0",
+    "rollup-plugin-node-resolve": "^3.2.0",
+    "rollup-plugin-replace": "^2.0.0",
+    "rollup-plugin-typescript": "^0.8.1",
+    "rollup-plugin-uglify": "^3.0.0"
   }
 }

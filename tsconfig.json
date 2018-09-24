@@ -8,7 +8,7 @@
     "target": "es5",
     "sourceMap": false,
     "declaration": true,
-    "lib": ["es2017"],
+    "lib": ["dom", "esnext"],
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "experimentalDecorators": true,

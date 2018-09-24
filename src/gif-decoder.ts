@@ -17,7 +17,7 @@ const CONSTANT_FALG = {
     commentExtension: 0xFE, // 254
     endFlag: 0x3B, // 59
 };
-export default class Gif {
+export default class GifDecoder {
     constructor(data?: Blob) {
         if (data) {
             this.fieldReader = new FileReader();

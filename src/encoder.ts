@@ -2,12 +2,21 @@
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 16:20:30
+ * @Last Modified time: 2018-09-24 19:47:23
  */
 
 import NeuQuant from './neuquant.js';
+import './lzw-encode';
 import workPool from './work';
-import { IFrame } from './frame.js';
+
+interface IFrame {
+    w: number;
+    h: number;
+    x?: number;
+    y?: number;
+    pixels: number[];
+    delay?: number;
+}
 
 interface IFrameData {
     x: number;
@@ -119,7 +128,6 @@ function optimizeImagePixels(frames: IFrameData[]) {
             x += maxStartOffset;
             w -= maxStartOffset + maxEndOffset;
         }
-
         return {
             ...frame,
             x,
@@ -141,11 +149,11 @@ function optimizeImagePixels(frames: IFrameData[]) {
  * @returns {IFrameData}
  */
 function transformFrameToFrameData(frame: IFrame): IFrameData {
-    const { x, y, w, h, pixels } = frame;
-    const delay = (frame.delay || 0) / 10;
+    const { w, h, pixels } = frame;
+    const delay = (frame.delay || 100) / 10;
     return {
-        x,
-        y,
+        x: frame.x || 0,
+        y: frame.y || 0,
         w,
         h,
         pixels,
@@ -246,7 +254,6 @@ function parseFramePalette(frameDatas: IFrameData[]): IFrameData[] {
 
         return info;
     });
-
     const info = {...firstFrameData}
     info.hasTransparenc = hasTransparenc;
     info.transparentColorIndex = transparencIndex;
@@ -259,7 +266,7 @@ function parseFramePalette(frameDatas: IFrameData[]): IFrameData[] {
 /** 压缩 */
 async function encodeFramePixels(frameDatas: IFrameData[]) {
     const globalPalette = frameDatas[0].palette;
-    return await Promise.all(frameDatas.map(async (imgData, i) => {
+    return await Promise.all(frameDatas.map(async (imgData) => {
         const isZip = imgData.isZip;
         const transparentColorIndex = imgData.transparentColorIndex;
         const isGlobalPalette = imgData.isGlobalPalette;
@@ -275,7 +282,7 @@ async function encodeFramePixels(frameDatas: IFrameData[]) {
                 const g = pixels[i + 1];
                 const b = pixels[i + 2];
 
-                if (isZip) {
+                if (isZip) { // from: https://github.com/unindented/neuquant-js/blob/master/src/helpers.js
                     let minpos = 0;
                     let mind = 256 * 256 * 256;
                     for (let i = 0; i < palette.length; i += 3) {
@@ -312,6 +319,7 @@ async function encodeFramePixels(frameDatas: IFrameData[]) {
             arr],
             [arr.buffer]
         );
+
         imgData.pixels = codes;
 
         return imgData;
@@ -348,7 +356,7 @@ function decreasePalette(frameData: IFrameData, colorDepth: number = 8) {
             samplefac: 1,
         });
         nq.buildColorMap();
-        colors = nq.getColorMap();
+        colors = Array.from(nq.getColorMap());
     }
 
     frameData.isZip = colorMap.size > 1 << colorDepth;
@@ -367,9 +375,6 @@ export default async function encoder(frames: IFrame[]) {
     let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToFrameData(f)));
 
     imgDatas = await encodeFramePixels(parseFramePalette(imgDatas.map(d => decreasePalette(d))));
-
-    console.log(imgDatas);
-
     const codes: number[] = [];
     
     codes.push(...strTocode('GIF89a')); //头部识别信息
@@ -401,22 +406,26 @@ export default async function encoder(frames: IFrame[]) {
     codes.push(0);
     codes.push(0);
     codes.push(0);
-    imgDatas.filter(data => data.w && data.h).forEach((data, i) => {
+    imgDatas.filter(data => data.w && data.h).forEach((data) => {
         // 1. Graphics Control Extension
         codes.push(0x21); // exc flag
         codes.push(0xf9); // al
         codes.push(4); // byte size
         let m = 0;
-        m += ((data.x || data.y) ? 1 : 0) << 2
+        let displayType = 0;
+        if (data.x || data.y) {
+            displayType = 2;
+        }
+        if (data.hasTransparenc) {
+            displayType = 1;
+        }
+
+        m += displayType << 2
         m += 1 << 1; // sortFlag
         m += data.hasTransparenc ? 1 : 0;
 
         codes.push(m);
-        if (i === 0) {
-            codes.push(0, 0);
-        } else {
-            codes.push(data.delay & 255, data.delay >> 8);
-        }
+        codes.push(data.delay & 255, data.delay >> 8);
         codes.push(data.transparentColorIndex || 0);
         codes.push(0);
 
@@ -446,7 +455,6 @@ export default async function encoder(frames: IFrame[]) {
         const c = Array.from(data.pixels);
         let len = c.length;
         
-
         while (len > 0) {
             codes.push(Math.min(len, 0xff));
             codes.push(...c.splice(0, 0xff));
@@ -456,6 +464,5 @@ export default async function encoder(frames: IFrame[]) {
     });
 
     codes.push(0x3b);
-    console.timeEnd('write frame');
     return codes;
 }

@@ -13,5 +13,3 @@ TODO:
 - [ ] video转(canvas | blob | ArrayBuffer)
 - [ ] gif有损压缩
 - [x] 增加多个worker支持, 但是貌似不能复用?
-- [ ] 只用全局调色板不一定生成的gif体积就小, 还要看像素使用的频率
-- [ ] 帧数过多会很卡?
