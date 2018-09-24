@@ -1,8 +1,9 @@
-import nodeResolve from 'rollup-plugin-node-resolve';
+
 import commonjs from 'rollup-plugin-commonjs';
 import uglify from 'rollup-plugin-uglify';
 import typescript from 'rollup-plugin-typescript2';
 
+const override = { compilerOptions: { declaration: false } };
 
 const env = process.env.NODE_ENV;
 
@@ -13,11 +14,7 @@ const config = {
         name: 'ligif',
     },
     plugins: [
-        nodeResolve(),
-        typescript(),
-        replace({
-            'process.env.NODE_ENV': JSON.stringify(env),
-        }),
+        typescript({ tsconfig: 'tsconfig.json', tsconfigOverride: override }),
         commonjs(),
     ],
 };

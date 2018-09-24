@@ -9,6 +9,7 @@
     "sourceMap": false,
     "lib": ["dom", "esnext"],
     "noUnusedLocals": true,
+    "declaration": true,
     "noUnusedParameters": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
@@ -19,7 +20,6 @@
   },
   "include": [
     "src/**/*",
-    "example/**/*"
   ],
   "exclude": [
     ".git",
