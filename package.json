@@ -1,6 +1,6 @@
 {
   "name": "ligif",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "tool library for gif",
   "main": "lib/index.js",
   "module": "es/index.js",
