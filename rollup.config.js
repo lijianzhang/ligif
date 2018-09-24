@@ -9,13 +9,9 @@ const env = process.env.NODE_ENV;
 
 const config = {
     input: 'src/index.ts',
-    external: ['react'],
     output: {
         format: 'umd',
-        name: 'liob',
-        globals: {
-            react: 'React',
-        },
+        name: 'ligif',
     },
     plugins: [
         nodeResolve(),

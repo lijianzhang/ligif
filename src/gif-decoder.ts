@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-23 15:26:00
+ * @Last Modified time: 2018-09-24 20:11:59
  */
 import Frame, { IFrameOpiton } from './frame';
 import './lzw-decode';
@@ -24,7 +24,6 @@ export default class GifDecoder {
             this.fieldReader.readAsArrayBuffer(data);
             this.fieldReader.onload = this.onLoad.bind(this);
         }
-        (window as any).gif = this;
     }
 
     async readData(data: Blob) {
