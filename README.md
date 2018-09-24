@@ -1,6 +1,6 @@
 # LIGIF
 
-支持直接在浏览器生产和解析GIF图片的工具库
+支持直接在浏览器生成和解析GIF图片的工具库
 
 ### 参考资料
 * 文件格式: [3MF Project: What’s In A GIF - Bit by Byte](http://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp)
@@ -26,9 +26,9 @@ npm i -S ligif
 
 ```javas
 import { GIFEncoder } from 'ligif';
-const img1 = document.getElementById('img1') as HTMLImageElement;
-const img2 = document.getElementById('img2') as HTMLImageElement;
-const img3 = document.getElementById('img3') as HTMLImageElement;
+const img1 = document.getElementById('img1');
+const img2 = document.getElementById('img2');
+const img3 = document.getElementById('img3');
 
 const encoder = new GIFEncoder(img1.width, img1.height);
 encoder.addFrame({ img: img1 });
