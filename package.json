@@ -4,7 +4,6 @@
   "description": "tool library for gif",
   "main": "lib/index.js",
   "module": "es/index.js",
-  "private": true,
   "scripts": {
     "start": "parcel  serve example/index.html",
     "build:commonjs": "tsc -m commonjs --outdir lib",
