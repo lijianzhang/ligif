@@ -38,23 +38,10 @@ const defaults = {
     samplefac: 10
 }
 
-const assign = function (target) {
-    for (let i = 1, l = arguments.length; i < l; i++) {
-        const nextSource = arguments[i]
-        if (nextSource != null) {
-            for (const nextKey in nextSource) {
-                if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
-                    target[nextKey] = nextSource[nextKey]
-                }
-            }
-        }
-    }
-    return target
-}
 
 export default class NeuQuant {
-    constructor(pixels, options) {
-        assign(this, defaults, {
+    constructor(pixels: number[], options: { ncycles?: number; netsize?: number; samplefac?: number }) {
+        Object.assign(this, defaults, {
             pixels
         }, options)
 
@@ -104,6 +91,8 @@ export default class NeuQuant {
             this.bias[i] = 0
         }
     }
+
+    [k: string]: any;
 
     unbiasnet() {
         for (let i = 0, l = this.netsize; i < l; i++) {
@@ -298,8 +287,8 @@ export default class NeuQuant {
     }
 
     getColorMap() {
-        const map = new Buffer(this.netsize * 3)
-        const index = new Buffer(this.netsize)
+        const map = new Uint8Array(this.netsize * 3)
+        const index = new Uint8Array(this.netsize)
 
         for (let i = 0, l = this.netsize; i < l; i++) {
             index[this.network[i][3]] = i

@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 20:11:59
+ * @Last Modified time: 2018-09-24 21:07:54
  */
 import Frame, { IFrameOpiton } from './frame';
 import './lzw-decode';
@@ -46,7 +46,6 @@ export default class GifDecoder {
     private currentOptions?: IFrameOpiton;
 
     private async onLoad(dataSource: number[] | Uint8Array) {
-        console.group('decoder gif')
         this.dataSource = new Uint8Array(dataSource);
         this.readHeader();
         this.readLogicalScreenDescriptor();
@@ -58,11 +57,7 @@ export default class GifDecoder {
         while(!this.loaded) {
             this.readExtension();
         }
-
-        console.time('parsePixels');
         await this.parsePixels();
-        console.timeEnd('parsePixels');
-        console.groupEnd();
         if (this.next) this.next(this);
     }
 

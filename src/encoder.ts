@@ -2,10 +2,10 @@
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 19:47:23
+ * @Last Modified time: 2018-09-24 21:05:15
  */
 
-import NeuQuant from './neuquant.js';
+import NeuQuant from './neuquant';
 import './lzw-encode';
 import workPool from './work';
 
