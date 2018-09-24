@@ -113,13 +113,14 @@ export default class GIFEncoder {
         f.prevFrame = preFrame;
         this.frames.push(f);
     }
-
+aa
     addFrames(frames: Frame[]) {
         frames.forEach(frame => this.addFrame(frame));
     }
 
     async generate(samplefac?: number, colorDepth?: number) {
         console.time('new generate time');
+        // const codes = await encoder(this.frames);
         this.codes = await encoder(this.frames);
         console.timeEnd('new generate time');
 
@@ -129,12 +130,13 @@ export default class GIFEncoder {
         // await this.generatePalette();
         // this.writeLogicalScreenDescriptor();
         // this.writeApplicationExtension();
-        // console.time('wirteFrames');
-        // await this.wirteFrames();
-        // console.timeEnd('wirteFrames');
-        // this.addCode(0x3b);
-        // console.timeEnd('generate time');
-        // console.groupEnd();
+    //     console.time('wirteFrames');
+    //     await this.wirteFrames();
+    //     console.timeEnd('wirteFrames');
+    //     this.addCode(0x3b);
+    //     console.timeEnd('generate time');
+    //     console.groupEnd();
+    //     console.log(this.codes);
     }
 
     private strTocode(str: string) {
@@ -340,7 +342,7 @@ export default class GIFEncoder {
     async wirteFrames() {
         const frames = this.frames.filter(f => f.w && f.h);
         const codesArray = await Promise.all(
-            frames.map(async frame => {
+            frames.slice(0, 4).map(async frame => {
                 let codes: number[] = [];
                 // 1. Graphics Control Extension
                 codes.push(0x21); // exc flag
@@ -395,12 +397,13 @@ export default class GIFEncoder {
                     }
                 }
                 const buffer = Uint8Array.from(indexs);
-                const data = await workPool.executeWork('encode', [
+                const b = await workPool.executeWork('encode', [
                     frame.w,
                     frame.h,
                     colorDepth,
-                    buffer.buffer,
-                ], [buffer.buffer]);
+                    buffer,
+                ]);
+                const data = Array.from(b);
                 let len = data.length;
                 while (len > 0) {
                     codes.push(Math.min(len, 0xff));

@@ -2,46 +2,47 @@
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-23 16:04:06
+ * @Last Modified time: 2018-09-24 16:20:30
  */
 
 import NeuQuant from './neuquant.js';
 import workPool from './work';
-import LzwEncoder from './lzw-encode';
-type ImageCodeType = Uint8Array;
+import { IFrame } from './frame.js';
 
-interface IImageInfo {
+interface IFrameData {
     x: number;
     y: number;
     w: number;
     h: number;
-    delay: number;
+    isZip: boolean;
     pixels: number[] | Uint8Array;
+    delay: number;
+    palette: number[];
+    isGlobalPalette: boolean;
+    transparentColorIndex?: number;
+    hasTransparenc: boolean;
 }
 
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 
-// [x, y, w, h, delay, 像素长度, ...像素, 是否有透明色, 颜色是否压缩过, 是否有透明性, 透明色位置, 是否使用全局颜色, ...颜色数据 ]
 
 /**
- * 优化像素
+ * 优化像素: 去掉相对于上一帧重复的像素
  *
- * @param {ImageCodeType[]} imageDatas
- * @returns 内容格式为 [x, y, w, h, delay, 像素长度, ...像素]
+ * @param {frames[]} imageDatas[]
  */
-function optimizeImagePixels(imageDatas: ImageCodeType[]) {
-    const [firstImageData, ...otherImageData] = imageDatas;
-    const width = firstImageData[4] + (firstImageData[5] << 8);
-    const lastPixels = Array.from(firstImageData.slice(10));
+function optimizeImagePixels(frames: IFrameData[]) {
+    const [firstFrameData, ...otherFrameDatas] = frames;
+    const width = firstFrameData.w;
+    const lastPixels = firstFrameData.pixels.slice();
 
-    const datas = otherImageData.map(imageData => {
-        let x = imageData[0] + (imageData[1] << 8);
-        let y = imageData[2] + (imageData[3] << 8);
-        let w = imageData[4] + (imageData[5] << 8);
-        let h = imageData[6] + (imageData[7] << 8);
-        const delay = (imageData[8] + (imageData[9] << 8)) * 10;
-        let pixels = imageData.slice(10);
-        let imgData:number[] = [];
+    const datas = otherFrameDatas.map(frame => {
+        let x = frame.x;
+        let y = frame.y;
+        let w = frame.w;
+        let h = frame.h;
+        let pixels = frame.pixels;
+        let newPixels:number[] = [];
 
         // let alphaList: number[] = [];
         let startNum = 0; // 表示从0开始连续的透明像素的数目
@@ -67,14 +68,14 @@ function optimizeImagePixels(imageDatas: ImageCodeType[]) {
             }
 
             if ((r1 === r2 && g1 === g2 && b1 === b2) || a === 0) {
-                imgData.push(0, 0, 0, 0);
+                newPixels.push(0, 0, 0, 0);
                 if (!isDone) {
                     startNum += 1;
                 }
                 startOffset += 1;
                 endNum += 1;
             } else {
-                imgData.push(r1, g1, b1, a);
+                newPixels.push(r1, g1, b1, a);
                 lastPixels[offset] = r1;
                 lastPixels[offset + 1] = g1;
                 lastPixels[offset + 2] = b1;
@@ -105,10 +106,10 @@ function optimizeImagePixels(imageDatas: ImageCodeType[]) {
             h -= bottom;
         }
 
-        imgData = imgData.slice(start, end);
+        newPixels = newPixels.slice(start, end);
 
         if (maxEndOffset || maxStartOffset) {
-            imgData = imgData.filter((_, i) => {
+            newPixels = newPixels.filter((_, i) => {
                 const range = Math.floor(i / 4) % w;
                 if (range < maxStartOffset || range >= w - maxEndOffset) {
                     return false;
@@ -119,37 +120,41 @@ function optimizeImagePixels(imageDatas: ImageCodeType[]) {
             w -= maxStartOffset + maxEndOffset;
         }
 
-        return transformFrameToImageData({
+        return {
+            ...frame,
             x,
             y,
             w,
             h,
-            pixels: imgData,
-            delay,
-        });
+            pixels: newPixels,
+        }
     });
 
-    return [firstImageData].concat(datas);
+    return [firstFrameData].concat(datas);
 }
 
+
 /**
+ * 转换成压缩时需要的数据格式
  *
- * 为性能考虑, 把frame的格式转为Uint8Array类型,
- * @param {IImageInfo} frame
- * @returns 内容格式为 [x, y, w, h, delay, ...像素]
+ * @param {IFrame} frame
+ * @returns {IFrameData}
  */
-function transformFrameToImageData(frame: IImageInfo) {
+function transformFrameToFrameData(frame: IFrame): IFrameData {
     const { x, y, w, h, pixels } = frame;
     const delay = (frame.delay || 0) / 10;
-    const imageData = new Uint8Array(pixels.length + 10);
-
-    imageData.set([x & 255, x >> 8], 0);
-    imageData.set([y & 255, y >> 8], 2);
-    imageData.set([w & 255, w >> 8], 4);
-    imageData.set([h & 255, h >> 8], 6);
-    imageData.set([delay & 255, delay >> 8], 8);
-    imageData.set(pixels, 10);
-    return imageData;
+    return {
+        x,
+        y,
+        w,
+        h,
+        pixels,
+        delay,
+        palette: [],
+        isGlobalPalette: false,
+        isZip: false,
+        hasTransparenc: false,
+    }
 }
 
 /**
@@ -159,7 +164,7 @@ function transformFrameToImageData(frame: IImageInfo) {
  * @returns
  */
 function fillPalette(palette: number[]) {
-    const colorSize = Math.ceil(Math.log2(palette.length / 3));
+    const colorSize = Math.max(Math.ceil(Math.log2(palette.length / 3)), 2);
     const diff = (1 << colorSize) - palette.length / 3;
     const arr = new Array(diff * 3);
     arr.fill(0);
@@ -167,8 +172,6 @@ function fillPalette(palette: number[]) {
 }
 
 /**
- * 为了性能考虑, 将是否有透明性, 透明色位置 颜色数, 和是否使用全局颜色生产 Uint8Array 格式
- * 格式为 [x, y, w, h, delay, 像素长度, ...像素, 颜色是否压缩过, 是否有透明性, 透明色位置, 是否使用全局颜色, 颜色数 ]
  * 解析帧的图像: 配置帧图像的颜色和透明数据
  * TODO: 只用全局调色板不一定生成的gif体积就小, 尤其在颜色深度比较小的 gif 比较明显;
  *      因为颜色深度变大后, image data 占据的位数也会变大, 所以还要看像素使用的频率,
@@ -176,22 +179,22 @@ function fillPalette(palette: number[]) {
  * 2. 或者改为,当颜色深度超过某一值得时候不再增加?
  * @memberof GIFEncoder
  */
-function parseFramePalette(pixelInfos: ImageCodeType[]) {
-    const firstPixelInfo = Array.from(pixelInfos[0]);
-    let firstPalette = firstPixelInfo.slice(13, 13 + (firstPixelInfo[12] + 1) * 3);
+function parseFramePalette(frameDatas: IFrameData[]): IFrameData[] {
+    const firstFrameData = frameDatas[0];
+    let firstPalette = firstFrameData.palette;
 
-    let hasTransparenc = !!firstPixelInfo[0];
+    let hasTransparenc = firstFrameData.hasTransparenc;
     let transparencIndex: number | undefined;
     if (hasTransparenc) {
         transparencIndex = firstPalette.length / 3;
         firstPalette.push(0, 0, 0);
     }
 
-    const otherPixelInfos = pixelInfos.slice(1);
+    const otherPixelInfos = frameDatas.slice(1);
     const imageDatas = otherPixelInfos.map(d => {
-        const info = d;
-        let data: number[] = Array.from(info.slice(0, 12));
-        const palette =   Array.from(info.slice(13, 13 + (info[12] + 1) * 3));
+        const info = { ...d };
+
+        const palette =   info.palette;
 
         let firstPaletteCopy = firstPalette.slice();
         let diffPallette: number[] = [];
@@ -208,76 +211,65 @@ function parseFramePalette(pixelInfos: ImageCodeType[]) {
                     hasSome = true;
                 }
             }
-            if (!hasSome) diffPallette.push(...Array.from(palette.slice(x, x + 3)));
+            if (!hasSome) diffPallette.push(...palette.slice(x, x + 3));
         }
 
         const isLocalPalette = (firstPalette.length + diffPallette.length) / 3
-                                + ((!!data[11] && !hasTransparenc) ? 1 : 0)
+                                + ((!!info.hasTransparenc && !hasTransparenc) ? 1 : 0)
                                 > 1 << Math.ceil(Math.log2(firstPalette.length / 3));
-        if (data[11]) {
+        if (info.hasTransparenc) {
             // 添加透明色位置
             if (isLocalPalette) {
                 const transparencIndex = palette.length / 3;
-                data.push(transparencIndex);
+                info.transparentColorIndex = transparencIndex;
                 palette.push(0, 0, 0);
             } else {
                 if (hasTransparenc) {
-                    data.push(transparencIndex!);
+                    info.transparentColorIndex = transparencIndex;
                 } else {
                     transparencIndex = firstPalette.length / 3;
                     firstPalette.push(0, 0, 0);
                     hasTransparenc = true;
                 }
             }
-        } else {
-            data.push(0);
         }
         
         if (isLocalPalette) {
             // 添加是否使用全局颜色
-            data.push(0);
+            info.isGlobalPalette = false;
             const p = fillPalette(Array.from(palette));
-
-            data.push(p.length / 3 - 1);
-            data = data.concat(p);
+            info.palette = p;
         } else {
             firstPalette.push(...diffPallette);
-            data.push(1);
+            info.isGlobalPalette = true;
         }
-        const imgdata = info.slice(13 + (info[12] + 1) * 3);
 
-        const arr = new Uint8Array(data.length + imgdata.length);
-        arr.set(data, 0);
-        arr.set(imgdata, data.length);
-        return arr;
+        return info;
     });
 
-    let arr: number[] = Array.from(firstPixelInfo.slice(0, 11));
-    arr.push(hasTransparenc ? 1 : 0, transparencIndex! || 0, 1);
+    const info = {...firstFrameData}
+    info.hasTransparenc = hasTransparenc;
+    info.transparentColorIndex = transparencIndex;
+    info.isGlobalPalette = true;
+    info.palette = fillPalette(firstPalette);
 
-    const palette = fillPalette(Array.from(firstPalette));
-
-    arr.push(palette.length / 3 - 1);
-    arr.push(...palette);
-    arr = arr.concat(firstPixelInfo.slice(13 + (firstPixelInfo[12] + 1) * 3));
-    return [Uint8Array.from(arr)].concat(imageDatas);
+    return [info].concat(imageDatas);
 }
 
 /** 压缩 */
-async function encodeFramePixels(imageDatas: ImageCodeType[]) {
-    const globalPalette = imageDatas[0].slice(15, 15 + (imageDatas[0][14] + 1) * 3);
-    return await Promise.all(imageDatas.map(async imgData => {
-        const baseData = Array.from(imgData.slice(0, 15 + (imgData[14] + 1) * 3));
-        const isZip = imgData[10];
-        const transparentColorIndex = imgData[12];
-        const isGlobalPalette = imgData[13];
-        const pixels = imgData.slice(15 + (imgData[14] + 1) * 3);
+async function encodeFramePixels(frameDatas: IFrameData[]) {
+    const globalPalette = frameDatas[0].palette;
+    return await Promise.all(frameDatas.map(async (imgData, i) => {
+        const isZip = imgData.isZip;
+        const transparentColorIndex = imgData.transparentColorIndex;
+        const isGlobalPalette = imgData.isGlobalPalette;
+        const pixels = imgData.pixels;
         
         const indexs: number[] = [];
-        const palette = isGlobalPalette ? globalPalette : imgData.slice(15, 15 + (imgData[14] + 1) * 3);
+        const palette = isGlobalPalette ? globalPalette : imgData.palette;
         for (let i = 0; i < pixels.length; i += 4) {
             if (pixels[i + 3] === 0) {
-                indexs.push(transparentColorIndex);
+                indexs.push(transparentColorIndex!);
             } else {
                 const r = pixels[i];
                 const g = pixels[i + 1];
@@ -314,36 +306,28 @@ async function encodeFramePixels(imageDatas: ImageCodeType[]) {
 
         const arr = Uint8Array.from(indexs)
         const codes = await workPool.executeWork('encode', [
-            imgData[4] + (imgData[5] << 8),
-            imgData[6] + (imgData[7] << 8),
+            imgData.w,
+            imgData.h,
             Math.log2(palette.length / 3),
             arr],
             [arr.buffer]
         );
+        imgData.pixels = codes;
 
-        // const encode = new LzwEncoder(imgData[4] + (imgData[5] << 8),
-        // imgData[6] + (imgData[7] << 8),
-        // Math.log2(palette.length / 3))
-        // const codes = encode.encode(arr);
-        const data = new Uint8Array(baseData.length + codes.length);
-        data.set(baseData, 0);
-        data.set(codes, baseData.length);
-        return data;
-        // const data =  baseData.concat(Array.from(codes));
+        return imgData;
     }));
 }
 
 /**
  * 对颜色数超过设置的颜色质量参数, 减少颜色质量
  *
- * @param {ImageCodeType} imgData
+ * @param {frameData} IFrameData
  * @param {number} [colorDepth=8]
- * @returns [x, y, w, h, delay, 颜色是否压缩过, 是否有透明色, 颜色数量, ...颜色数据, ...像素 ];
  *
  */
-function decreasePalette(imgData: ImageCodeType, colorDepth: number = 8) {
+function decreasePalette(frameData: IFrameData, colorDepth: number = 8) {
     const colorMap: Map<string, boolean> = new Map();
-    const pixels = imgData.slice(10);
+    const pixels = frameData.pixels;
     let colors: number[] = [];
     for (let index = 0; index < pixels.length; index += 4) {
         const r = pixels[index];
@@ -367,24 +351,24 @@ function decreasePalette(imgData: ImageCodeType, colorDepth: number = 8) {
         colors = nq.getColorMap();
     }
 
-    let data = Array.from(imgData.slice(0, 10));
-    data.push(colorMap.size > 1 << colorDepth ? 1 : 0);
-    data.push(colorMap.get('a') ? 1 : 0);
-    data.push(colors.length / 3 - 1);
-    data = data.concat(colors).concat(Array.from(pixels));
-
-    return Uint8Array.from(data);
+    frameData.isZip = colorMap.size > 1 << colorDepth;
+    frameData.hasTransparenc = !!colorMap.get('a');
+    frameData.palette = colors;
+    
+    return frameData;
 }
 
 function strTocode(str: string) {
     return str.split('').map(s => s.charCodeAt(0));
 }
 
-export default async function encoder(frames: IImageInfo[]) {
+export default async function encoder(frames: IFrame[]) {
 
-    let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToImageData(f)));
+    let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToFrameData(f)));
 
     imgDatas = await encodeFramePixels(parseFramePalette(imgDatas.map(d => decreasePalette(d))));
+
+    console.log(imgDatas);
 
     const codes: number[] = [];
     
@@ -393,20 +377,19 @@ export default async function encoder(frames: IImageInfo[]) {
     // writeLogicalScreenDescriptor
     const firstImageData = imgDatas[0];
 
-    codes.push(firstImageData[4], firstImageData[5]);  // w
-    codes.push(firstImageData[6], firstImageData[7]); // h
+    codes.push(firstImageData.w & 255, firstImageData.w >> 8);  // w
+    codes.push(firstImageData.h & 255, firstImageData.h >> 8);  // w
 
-    const palette = firstImageData.slice(15, 15 + (firstImageData[14] + 1) * 3);
+    const globalPalette = firstImageData.palette;
     let m = 1 << 7; // globalColorTableFlag
     m += 0 << 4; // colorResolution
     m += 0 << 3; // sortFlag
-    m += palette.length ? Math.ceil(Math.log2(palette.length / 3)) - 1 : 0; // sizeOfGlobalColorTable
+    m += globalPalette.length ? Math.ceil(Math.log2(globalPalette.length / 3)) - 1 : 0; // sizeOfGlobalColorTable
 
     codes.push(m);
     codes.push(0); // backgroundColorIndex
     codes.push(255); // pixelAspectRatio
-    codes.push(...Array.from(palette));
-
+    codes.push(...globalPalette);
 
     // writeApplicationExtension
     codes.push(0x21);
@@ -418,36 +401,36 @@ export default async function encoder(frames: IImageInfo[]) {
     codes.push(0);
     codes.push(0);
     codes.push(0);
-
-    const globalPalette = firstImageData.slice(15, 15 + (firstImageData[14] + 1) * 3);
-
-    imgDatas.filter(data => (data[4] + data[5] << 8) && (data[6] + data[6] << 8)).forEach((data, i) => {
+    imgDatas.filter(data => data.w && data.h).forEach((data, i) => {
         // 1. Graphics Control Extension
         codes.push(0x21); // exc flag
         codes.push(0xf9); // al
         codes.push(4); // byte size
         let m = 0;
-        m += (data[11] ? 1 : 0) << 2
+        m += ((data.x || data.y) ? 1 : 0) << 2
         m += 1 << 1; // sortFlag
-        m += data[11]
+        m += data.hasTransparenc ? 1 : 0;
 
         codes.push(m);
         if (i === 0) {
             codes.push(0, 0);
         } else {
-            codes.push(data[8], data[9]);
+            codes.push(data.delay & 255, data.delay >> 8);
         }
-        codes.push(data[12]);
+        codes.push(data.transparentColorIndex || 0);
         codes.push(0);
 
         // 2. image Descriptor
         codes.push(0x2c);
 
-        codes.push(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]); // add x, y, w, h
+        codes.push(data.x & 255, data.x >> 8); // add x, y, w, h
+        codes.push(data.y & 255, data.y >> 8); // add x, y, w, h
+        codes.push(data.w & 255, data.w >> 8); // add x, y, w, h
+        codes.push(data.h & 255, data.h >> 8); // add x, y, w, h
 
         m = 0;
-        const isGlobalPalette = data[13];
-        const palette = isGlobalPalette ? globalPalette : data.slice(15, 15 + (data[14] + 1) * 3);
+        const isGlobalPalette = data.isGlobalPalette;
+        const palette = isGlobalPalette ? globalPalette : data.palette;
         const sizeOfColorTable = Math.ceil(Math.log2(palette.length / 3)) - 1;
         const colorDepth = sizeOfColorTable + 1;
         if (!isGlobalPalette) {
@@ -455,12 +438,12 @@ export default async function encoder(frames: IImageInfo[]) {
         }
         codes.push(m);
         if (!isGlobalPalette) {
-            codes.push(...Array.from(palette));
+            codes.push(...palette);
         }
 
         // image data
         codes.push(colorDepth);
-        const c = Array.from(data.slice(15 + (data[14] + 1) * 3));
+        const c = Array.from(data.pixels);
         let len = c.length;
         
 
