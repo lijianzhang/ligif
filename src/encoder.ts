@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-25 00:38:02
+ * @Last Modified time: 2018-09-25 01:09:17
  */
 
 import NeuQuant from './neuquant';
@@ -150,7 +150,7 @@ function optimizeImagePixels(frames: IFrameData[]) {
  */
 function transformFrameToFrameData(frame: IFrame): IFrameData {
     const { w, h, pixels } = frame;
-    const delay = (frame.delay || 100) / 10;
+    const delay = Math.floor((frame.delay || 100) / 10);
     return {
         x: frame.x || 0,
         y: frame.y || 0,

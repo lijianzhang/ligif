@@ -1021,7 +1021,7 @@ workPool.registerWork('encode', (width, height, colorDepth, codes) => {
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-25 00:38:02
+ * @Last Modified time: 2018-09-25 01:09:17
  */
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 /**
@@ -1123,7 +1123,7 @@ function optimizeImagePixels(frames) {
  */
 function transformFrameToFrameData(frame) {
     const { w, h, pixels } = frame;
-    const delay = (frame.delay || 100) / 10;
+    const delay = Math.floor((frame.delay || 100) / 10);
     return {
         x: frame.x || 0,
         y: frame.y || 0,
@@ -1451,6 +1451,48 @@ class GifEncoder {
             this.codes = codes;
         });
     }
+    encodeByVideo(data) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (data.src instanceof File) {
+                data.src = URL.createObjectURL(data.src);
+            }
+            const video = document.createElement('video');
+            video.controls = true;
+            video.src = data.src;
+            yield new Promise((res, rej) => {
+                const delay = 1000 / data.fps;
+                const imgs = [];
+                let index = data.from;
+                try {
+                    function next() {
+                        if (index < Math.min(data.to, video.duration)) {
+                            video.currentTime = index;
+                            index += delay / 1000;
+                        }
+                        else {
+                            res(imgs);
+                        }
+                    }
+                    video.onseeked = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = this.w || video.videoWidth;
+                        canvas.height = this.h || video.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        this.addFrame({ img: canvas, delay });
+                        next();
+                    };
+                    video.onloadeddata = () => {
+                        next();
+                    };
+                }
+                catch (error) {
+                    rej(error);
+                }
+            });
+            return this.encode();
+        });
+    }
     toImageData(frame) {
         const canvas = document.createElement('canvas');
         canvas.width = this.w;
@@ -1472,6 +1514,8 @@ class GifEncoder {
     }
 }
 
+window.GIFEncoder = GifEncoder;
+window.GIFDecoder = GifDecoder;
 document.getElementById('main').addEventListener('drop', function (e) {
     e.stopPropagation();
     e.preventDefault();
@@ -1480,7 +1524,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
     gif.readData(field).then(gif => {
         gif.frames.forEach(f => f.renderToCanvas().canvas);
         setTimeout(() => {
-            const gIFEncoder = new GifEncoder(gif.frames[0].w, gif.frames[0].h, 1);
+            const gIFEncoder = new GifEncoder(gif.frames[0].w, gif.frames[0].h);
             gIFEncoder.addFrames(gif.frames);
             gIFEncoder.encode().then(() => {
                 const img = document.createElement('img');
@@ -1510,5 +1554,18 @@ encoder$1.encode().then(() => {
     img.src = URL.createObjectURL(encoder$1.toBlob());
     document.body.appendChild(img);
 });
+const field = document.getElementById('file');
+field.onchange = () => {
+    const a = new GifEncoder(320, 180);
+    a.encodeByVideo({ src: field.files[0], from: 1, to: 3, fps: 5 }).then(() => {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(a.toBlob());
+        document.body.appendChild(img);
+        const b = new GifDecoder();
+        b.readCodes(a.codes).then(() => {
+            b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+        });
+    });
+};
 
 })));

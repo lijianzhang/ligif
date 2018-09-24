@@ -75,6 +75,50 @@ export default class GifEncoder {
         this.codes = codes;
     }
 
+    async encodeByVideo(data: { src: string | File; from: number; to: number; fps: number; }) {
+
+        if (data.src instanceof File) {
+            data.src = URL.createObjectURL(data.src);
+        }
+        const video = document.createElement('video');
+        video.controls = true;
+        video.src = data.src;
+
+        await new Promise((res, rej) => {
+            const delay = 1000 / data.fps;
+
+            const imgs: any[] = [];
+            let index = data.from;
+            try {
+                function next() {
+                    if (index < Math.min(data.to, video.duration)) {
+                        video.currentTime = index;
+                        index += delay / 1000;
+                    }else {
+                        res(imgs);
+                    }
+                } 
+                video.onseeked = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = this.w || video.videoWidth;
+                    canvas.height = this.h || video.videoHeight;
+                    const ctx = canvas.getContext('2d')!;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    this.addFrame({ img: canvas, delay });
+                    next();
+                }
+                
+                video.onloadeddata = () => {
+                    next();
+                }
+                
+            } catch (error) {
+                rej(error);
+            }           
+        });
+        return this.encode();
+    }
+
     private toImageData(frame: ICanvasFrameData | IImageFrameData) {
         const canvas = document.createElement('canvas');
         canvas.width = this.w;

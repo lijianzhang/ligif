@@ -1,5 +1,8 @@
 import { GIFDecoder, GIFEncoder } from '../src';
 
+(window as any).GIFEncoder = GIFEncoder;
+(window as any).GIFDecoder = GIFDecoder;
+
 document.getElementById('main').addEventListener('drop', function (e) {
     e.stopPropagation();
     e.preventDefault();
@@ -9,7 +12,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
     gif.readData(field).then(gif => {
        gif.frames.forEach(f =>  f.renderToCanvas().canvas);
         setTimeout(() => {
-            const gIFEncoder = new GIFEncoder(gif.frames[0].w, gif.frames[0].h, 1);
+            const gIFEncoder = new GIFEncoder(gif.frames[0].w, gif.frames[0].h);
             gIFEncoder.addFrames(gif.frames);
 
 
@@ -48,3 +51,17 @@ encoder.encode().then(() => {
 });
 
 
+
+const field = document.getElementById('file') as HTMLInputElement;
+field.onchange = () => {
+    const a = new GIFEncoder(320, 180);
+    a.encodeByVideo({ src: field.files[0], from: 1, to: 3, fps: 5 }).then(() => {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(a.toBlob());
+        document.body.appendChild(img);
+        const b = new GIFDecoder();
+        b.readCodes(a.codes).then(() => {
+            b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+        })
+    });
+}
