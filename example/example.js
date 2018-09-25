@@ -388,7 +388,7 @@ workPool.registerWork('decode', (colorDepth, buffer) => {
                     this.colorSize += 1;
                 }
             }
-            return outputs;
+            return Uint8Array.from(outputs);
         }
     }
     const decode = new LzwDecode(colorDepth);
@@ -404,6 +404,36 @@ const CONSTANT_FALG = {
     commentExtension: 0xFE,
     endFlag: 0x3B,
 };
+function getFramePixles(frame) {
+    const pixels = [];
+    const data = frame.imgData;
+    if (!frame.isInterlace) {
+        data.forEach((k) => {
+            pixels.push(frame.palette[k * 3]);
+            pixels.push(frame.palette[k * 3 + 1]);
+            pixels.push(frame.palette[k * 3 + 2]);
+            pixels.push(k === frame.transparentColorIndex ? 0 : 255);
+        });
+    }
+    else {
+        let start = [0, 4, 2, 1];
+        let inc = [8, 8, 4, 2];
+        let index = 0;
+        for (let pass = 0; pass < 4; pass++) {
+            for (let i = start[pass]; i < frame.h; i += inc[pass]) {
+                for (let j = 0; j < frame.w; j++) {
+                    const idx = (i - 1) * frame.w * 4 + j * 4;
+                    const k = data[index];
+                    pixels[idx] = frame.palette[k * 3];
+                    pixels[idx + 1] = frame.palette[k * 3 + 1];
+                    pixels[idx + 2] = frame.palette[k * 3 + 2];
+                    pixels[idx + 3] = k === frame.transparentColorIndex ? 0 : 255;
+                    index += 1;
+                }
+            }
+        }
+    }
+}
 class GifDecoder {
     constructor(data) {
         this.frames = [];
@@ -443,9 +473,11 @@ class GifDecoder {
             this.fieldReader.readAsArrayBuffer(data);
             this.fieldReader.onload = this.onLoad.bind(this);
         }
+        workPool.registerWork('getFramePixles', getFramePixles);
     }
-    readData(data) {
+    readData(data, cb) {
         return __awaiter(this, void 0, void 0, function* () {
+            this.cb = cb;
             this.fieldReader = new FileReader();
             this.fieldReader.readAsArrayBuffer(data);
             yield new Promise(res => this.fieldReader.onload = () => { res(); });
@@ -453,8 +485,9 @@ class GifDecoder {
             return this;
         });
     }
-    readCodes(data) {
+    readCodes(data, cb) {
         return __awaiter(this, void 0, void 0, function* () {
+            this.cb = cb;
             yield this.onLoad(data);
             return this;
         });
@@ -478,7 +511,14 @@ class GifDecoder {
     }
     parsePixels() {
         return __awaiter(this, void 0, void 0, function* () {
-            yield Promise.all(this.frames.map(f => this.decodeToPixels(f)));
+            let progress = 0;
+            yield Promise.all(this.frames.map((f) => __awaiter(this, void 0, void 0, function* () {
+                yield this.decodeToPixels(f);
+                progress += 1 / this.frames.length * 100;
+                if (this.cb)
+                    this.cb(Math.ceil(progress));
+            })));
+            this.cb = undefined;
         });
     }
     read(len = 1) {
@@ -619,8 +659,8 @@ class GifDecoder {
     }
     decodeToPixels(frame) {
         return __awaiter(this, void 0, void 0, function* () {
-            // const colorDepth = Math.log2(frame.palette.length / 3);
-            const data = yield workPool.executeWork('decode', [frame.colorDepth, frame.imgData]);
+            const buffer = Uint8Array.from(frame.imgData);
+            const data = yield workPool.executeWork('decode', [frame.colorDepth, buffer], [buffer.buffer]);
             frame.pixels = [];
             if (!frame.isInterlace) {
                 data.forEach((k) => {
@@ -648,7 +688,6 @@ class GifDecoder {
                     }
                 }
             }
-            // frame.imgData = [];
         });
     }
     readPlainTextExtension() {
@@ -1021,7 +1060,7 @@ workPool.registerWork('encode', (width, height, colorDepth, codes) => {
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-25 01:09:17
+ * @Last Modified time: 2018-09-25 10:29:14
  */
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 /**
@@ -1324,10 +1363,16 @@ function decreasePalette(frameData, colorDepth = 8) {
 function strTocode(str) {
     return str.split('').map(s => s.charCodeAt(0));
 }
-function encoder(frames, time = 0) {
+function encoder(frames, time = 0, cb) {
     return __awaiter(this, void 0, void 0, function* () {
         let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToFrameData(f)));
+        let progress = 33;
+        if (cb)
+            cb(progress);
         imgDatas = yield encodeFramePixels(parseFramePalette(imgDatas.map(d => decreasePalette(d))));
+        progress += 33;
+        if (cb)
+            cb(progress);
         const codes = [];
         codes.push(...strTocode('GIF89a')); //头部识别信息
         // writeLogicalScreenDescriptor
@@ -1403,8 +1448,13 @@ function encoder(frames, time = 0) {
                 len -= 255;
             }
             codes.push(0);
+            progress += 1 / imgDatas.length * 33;
+            if (cb)
+                cb(progress);
         });
         codes.push(0x3b);
+        if (cb)
+            cb(100);
         return codes;
     });
 }
@@ -1445,13 +1495,13 @@ class GifEncoder {
     addFrames(frames) {
         frames.forEach(f => this.addFrame(f));
     }
-    encode() {
+    encode(cb) {
         return __awaiter(this, void 0, void 0, function* () {
-            const codes = yield encoder(this.frames, this.time);
+            const codes = yield encoder(this.frames, this.time, cb);
             this.codes = codes;
         });
     }
-    encodeByVideo(data) {
+    encodeByVideo(data, cb) {
         return __awaiter(this, void 0, void 0, function* () {
             if (data.src instanceof File) {
                 data.src = URL.createObjectURL(data.src);
@@ -1490,7 +1540,7 @@ class GifEncoder {
                     rej(error);
                 }
             });
-            return this.encode();
+            return this.encode(cb);
         });
     }
     toImageData(frame) {
@@ -1521,12 +1571,12 @@ document.getElementById('main').addEventListener('drop', function (e) {
     e.preventDefault();
     const field = e.dataTransfer.files[0];
     const gif = new GifDecoder();
-    gif.readData(field).then(gif => {
+    gif.readData(field, (progress) => console.log('progress:', progress)).then(gif => {
         gif.frames.forEach(f => f.renderToCanvas().canvas);
         setTimeout(() => {
             const gIFEncoder = new GifEncoder(gif.frames[0].w, gif.frames[0].h);
             gIFEncoder.addFrames(gif.frames);
-            gIFEncoder.encode().then(() => {
+            gIFEncoder.encode((progress) => console.log(progress)).then(() => {
                 const img = document.createElement('img');
                 img.src = URL.createObjectURL(gIFEncoder.toBlob());
                 document.body.appendChild(img);

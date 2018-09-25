@@ -8,7 +8,7 @@
 import workPool from './work';
 
 
-workPool.registerWork('decode', (colorDepth: number, buffer: number[] | Uint8Array) => {
+workPool.registerWork('decode', (colorDepth: number, buffer: Uint8Array) => {
     class LzwDecode {
         constructor(colorDepth: number) {
             this.defaultColorSize = Math.max(2, colorDepth);
@@ -80,7 +80,7 @@ workPool.registerWork('decode', (colorDepth: number, buffer: number[] | Uint8Arr
             return code;
         }
     
-        decode(buffers: Uint8Array | number[]) {
+        decode(buffers: Uint8Array) {
             this.buffers = buffers;
             const outputs: number[] = [];
             let code: number = this.clearCode;
@@ -117,7 +117,7 @@ workPool.registerWork('decode', (colorDepth: number, buffer: number[] | Uint8Arr
                 }
             }
     
-            return outputs;
+            return Uint8Array.from(outputs);
         }
      }
      const decode = new LzwDecode(colorDepth);

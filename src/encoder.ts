@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-25 01:09:17
+ * @Last Modified time: 2018-09-25 10:29:14
  */
 
 import NeuQuant from './neuquant';
@@ -370,11 +370,13 @@ function strTocode(str: string) {
     return str.split('').map(s => s.charCodeAt(0));
 }
 
-export default async function encoder(frames: IFrame[], time: number = 0) {
-
+export default async function encoder(frames: IFrame[], time: number = 0, cb?: (progress: number) => any) {
     let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToFrameData(f)));
-
+    let progress = 33;
+    if (cb) cb(progress);
     imgDatas = await encodeFramePixels(parseFramePalette(imgDatas.map(d => decreasePalette(d))));
+    progress += 33;
+    if (cb) cb(progress);
     const codes: number[] = [];
     
     codes.push(...strTocode('GIF89a')); //头部识别信息
@@ -463,8 +465,11 @@ export default async function encoder(frames: IFrame[], time: number = 0) {
             len -= 255;
         }
         codes.push(0);
+        progress += 1 / imgDatas.length * 33;
+        if (cb) cb(progress);
     });
 
     codes.push(0x3b);
+    if (cb) cb(100);
     return codes;
 }

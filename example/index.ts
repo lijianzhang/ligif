@@ -9,15 +9,12 @@ document.getElementById('main').addEventListener('drop', function (e) {
 
     const field = e.dataTransfer.files[0];
     const gif = new GIFDecoder();
-    gif.readData(field).then(gif => {
+    gif.readData(field, (progress) => console.log('progress:', progress)).then(gif => {
        gif.frames.forEach(f =>  f.renderToCanvas().canvas);
         setTimeout(() => {
             const gIFEncoder = new GIFEncoder(gif.frames[0].w, gif.frames[0].h);
             gIFEncoder.addFrames(gif.frames);
-
-
-
-            gIFEncoder.encode().then(() => {
+            gIFEncoder.encode((progress) => console.log(progress)).then(() => {
                 const img = document.createElement('img');
                 img.src = URL.createObjectURL(gIFEncoder.toBlob());
                 document.body.appendChild(img);

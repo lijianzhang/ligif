@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 21:07:54
+ * @Last Modified time: 2018-09-25 10:43:02
  */
 import Frame, { IFrameOpiton } from './frame';
 import './lzw-decode';
@@ -17,6 +17,37 @@ const CONSTANT_FALG = {
     commentExtension: 0xFE, // 254
     endFlag: 0x3B, // 59
 };
+
+function getFramePixles(frame: Frame) {
+    const pixels = [];
+    const data = frame.imgData;
+    if (!frame.isInterlace) {
+        data.forEach((k) => {
+            pixels.push(frame.palette[k * 3]);
+            pixels.push(frame.palette[k * 3 + 1]);
+            pixels.push(frame.palette[k * 3 + 2]);
+            pixels.push(k === frame.transparentColorIndex ? 0 : 255);
+        });
+    } else {
+        let start = [0, 4, 2, 1];
+        let inc = [8, 8, 4, 2];
+        let index = 0;
+        for (let pass = 0; pass < 4; pass++) {
+            for (let i = start[pass]; i < frame.h; i += inc[pass]) {
+                for (let j = 0; j < frame.w; j++) {
+                    const idx = (i - 1) * frame.w * 4 + j * 4;
+                    const k = data[index];
+                    pixels[idx] = frame.palette[k * 3];
+                    pixels[idx + 1] = frame.palette[k * 3 + 1];
+                    pixels[idx + 2] = frame.palette[k * 3 + 2];
+                    pixels[idx + 3] = k === frame.transparentColorIndex ? 0 : 255;
+                    index += 1;
+                }
+            }
+        }
+    }
+}
+
 export default class GifDecoder {
     constructor(data?: Blob) {
         if (data) {
@@ -24,9 +55,11 @@ export default class GifDecoder {
             this.fieldReader.readAsArrayBuffer(data);
             this.fieldReader.onload = this.onLoad.bind(this);
         }
+        workPool.registerWork('getFramePixles', getFramePixles);
     }
 
-    async readData(data: Blob) {
+    async readData(data: Blob, cb?: (progress: number) => any) {
+        this.cb = cb;
         this.fieldReader = new FileReader();
         this.fieldReader.readAsArrayBuffer(data);
         await new Promise(res => this.fieldReader.onload = () => {res();});
@@ -34,10 +67,13 @@ export default class GifDecoder {
         return this;
     }
 
-    async readCodes(data: number[]) {
+    async readCodes(data: number[], cb?: (progress: number) => any) {
+        this.cb = cb;
         await this.onLoad(data);
         return this;
     }
+
+    private cb?: (progress: number) => any;
 
     private fieldReader!: FileReader;
 
@@ -49,7 +85,7 @@ export default class GifDecoder {
         this.dataSource = new Uint8Array(dataSource);
         this.readHeader();
         this.readLogicalScreenDescriptor();
-
+        
         if (this.globalColorTableFlag) {
             const len =  2 ** (this.colorDepth + 1) * 3;
             this.palette = this.readColorTable(len);
@@ -57,6 +93,7 @@ export default class GifDecoder {
         while(!this.loaded) {
             this.readExtension();
         }
+
         await this.parsePixels();
         if (this.next) this.next(this);
     }
@@ -149,7 +186,13 @@ export default class GifDecoder {
     version!: string;
 
     async parsePixels() {
-        await Promise.all(this.frames.map(f => this.decodeToPixels(f)));
+        let progress = 0;
+        await Promise.all(this.frames.map(async (f) => {
+            await this.decodeToPixels(f);
+            progress += 1 / this.frames.length * 100;
+            if (this.cb) this.cb(Math.ceil(progress));
+        }));
+        this.cb = undefined;
     }
 
     private read(len = 1) {
@@ -310,8 +353,8 @@ export default class GifDecoder {
     }
 
     async decodeToPixels(frame: Frame) {
-        // const colorDepth = Math.log2(frame.palette.length / 3);
-        const data = await workPool.executeWork('decode', [frame.colorDepth, frame.imgData]);
+        const buffer = Uint8Array.from(frame.imgData);
+        const data = await workPool.executeWork('decode', [frame.colorDepth, buffer], [buffer.buffer]);
         frame.pixels = [];
         if (!frame.isInterlace) {
             data.forEach((k) => {
@@ -338,7 +381,6 @@ export default class GifDecoder {
                 }
             }
         }
-        // frame.imgData = [];
     }
 
     private readPlainTextExtension() {

@@ -70,12 +70,12 @@ export default class GifEncoder {
         frames.forEach(f => this.addFrame(f));
     }
 
-    async encode() {
-        const codes = await encoder(this.frames, this.time);
+    async encode(cb?: (progress: number) => any) {
+        const codes = await encoder(this.frames, this.time, cb);
         this.codes = codes;
     }
 
-    async encodeByVideo(data: { src: string | File; from: number; to: number; fps: number; }) {
+    async encodeByVideo(data: { src: string | File; from: number; to: number; fps: number; }, cb?: (progress: number) => any) {
 
         if (data.src instanceof File) {
             data.src = URL.createObjectURL(data.src);
@@ -116,7 +116,7 @@ export default class GifEncoder {
                 rej(error);
             }           
         });
-        return this.encode();
+        return this.encode(cb);
     }
 
     private toImageData(frame: ICanvasFrameData | IImageFrameData) {
