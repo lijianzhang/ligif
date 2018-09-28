@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-28 15:34:19
+ * @Last Modified time: 2018-09-29 01:16:56
  */
 
 import NeuQuant from './neuquant';
@@ -41,11 +41,12 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
  * @param {frames[]} imageDatas[]
  */
 function optimizeImagePixels(frames: IFrameData[]) {
-    const [firstFrameData] = frames;
-    const width = firstFrameData.w;
-    const lastPixels = [];
+    const width = frames[0].w + frames[0].x;
+    const height = frames[0].h + frames[0].y;
+    const lastPixels = new Array(width * height * 4);
 
     const datas = frames.map(frame => {
+        let paletteMap = new Map();
         let palette: number[] = [];
         let x = frame.x;
         let y = frame.y;
@@ -61,12 +62,13 @@ function optimizeImagePixels(frames: IFrameData[]) {
         let startOffset = 0;
         let maxStartOffset = w; //左边空白像素
         let maxEndOffset = w; // 右边空白像素
-        let hasTransparenc = false;
         let isZip = false;
+        let transparencCount = 0;
+
 
         for (let index = 0; index < pixels.length; index += 4) {
 
-            const offset = ((Math.floor(index / 4 / w) + y) * width + x + ((index / 4) % w)) * 4;
+            const offset = ((y + Math.floor(index / (w * 4))) * width * 4) + ((index % (w * 4)) / 4 + x) * 4;
             const r1 = pixels[index];
             const r2 = lastPixels[offset];
             const g1 = pixels[index + 1];
@@ -80,15 +82,23 @@ function optimizeImagePixels(frames: IFrameData[]) {
             }
 
             if ((r1 === r2 && g1 === g2 && b1 === b2) || a === 0) {
-                newPixels.push(0, 0, 0, 0);
-                hasTransparenc = true;
+                if (a === 0) {
+                    newPixels.push(0, 0, 0, 0);
+                } else {
+                    newPixels.push(r1, g1, b1, 0);
+                }
+                transparencCount += 1;
                 if (!isDone) {
                     startNum += 1;
                 }
                 startOffset += 1;
                 endNum += 1;
             } else {
-                palette.push(r1, g1,b1);
+                const c = `${r1},${g1},${b1}`;
+                if (!paletteMap.has(c)) {
+                    palette.push(r1, g1,b1);
+                    paletteMap.set(c, true);
+                }
                 newPixels.push(r1, g1, b1, a);
                 lastPixels[offset] = r1;
                 lastPixels[offset + 1] = g1;
@@ -103,8 +113,8 @@ function optimizeImagePixels(frames: IFrameData[]) {
                 maxEndOffset = endOffset < maxEndOffset ? endOffset : maxEndOffset;
             }
         }
-
-        const top = Math.floor(startNum / w);
+        transparencCount -= (startNum + endNum);
+        const top = Math.floor(startNum / w);;
         let start = 0;
         let end = pixels.length;
 
@@ -119,7 +129,6 @@ function optimizeImagePixels(frames: IFrameData[]) {
             end -= bottom * w * 4;
             h -= bottom;
         }
-
         newPixels = newPixels.slice(start, end);
 
         if (maxEndOffset || maxStartOffset) {
@@ -134,9 +143,9 @@ function optimizeImagePixels(frames: IFrameData[]) {
             w -= maxStartOffset + maxEndOffset;
         }
 
-        if (palette.length / 3 > 256) {
+        if (paletteMap.size > 256) {
             const nq = new NeuQuant(palette, {
-                netsize: hasTransparenc ? 255 : 256,
+                netsize: transparencCount > 0 ? 255 : 256,
                 samplefac: 1,
             });
             isZip = true;
@@ -150,13 +159,12 @@ function optimizeImagePixels(frames: IFrameData[]) {
             y,
             w,
             isZip,
-            hasTransparenc,
+            hasTransparenc: transparencCount > 0,
             h,
             palette,
             pixels: newPixels,
         } as IFrameData;
     });
-
     return datas;
 }
 
@@ -233,17 +241,15 @@ function parseFramePalette(frameDatas: IFrameData[]): IFrameData[] {
                     palette[x + 1] === firstPalette[y + 1] &&
                     palette[x + 2] === firstPalette[y + 2]
                 ) {
-                    firstPaletteCopy.splice(y, 3);
-                    y -= 3;
                     hasSome = true;
                 }
             }
             if (!hasSome) diffPallette.push(...palette.slice(x, x + 3));
         }
 
-        const isLocalPalette = (firstPalette.length + diffPallette.length) / 3
-                                + ((!!info.hasTransparenc && !hasTransparenc) ? 1 : 0)
-                                > 1 << Math.ceil(Math.log2(firstPalette.length / 3));
+
+        const isLocalPalette = (firstPalette.length + diffPallette.length) / 3 + ((!!info.hasTransparenc && !hasTransparenc) ? 1 : 0) > 1 << Math.ceil(Math.log2(firstPalette.length / 3));
+
         if (info.hasTransparenc) {
             // 添加透明色位置
             if (isLocalPalette) {
@@ -255,6 +261,7 @@ function parseFramePalette(frameDatas: IFrameData[]): IFrameData[] {
                     info.transparentColorIndex = transparencIndex;
                 } else {
                     transparencIndex = firstPalette.length / 3;
+                    info.transparentColorIndex = transparencIndex;
                     firstPalette.push(0, 0, 0);
                     hasTransparenc = true;
                 }
@@ -273,6 +280,7 @@ function parseFramePalette(frameDatas: IFrameData[]): IFrameData[] {
 
         return info;
     });
+
     const info = {...firstFrameData}
     info.hasTransparenc = hasTransparenc;
     info.transparentColorIndex = transparencIndex;
@@ -345,55 +353,18 @@ async function encodeFramePixels(frameDatas: IFrameData[]) {
     }));
 }
 
-/**
- * 对颜色数超过设置的颜色质量参数, 减少颜色质量
- *
- * @param {frameData} IFrameData
- * @param {number} [colorDepth=8]
- *
- */
-function decreasePalette(frameData: IFrameData, colorDepth: number = 8) {
-    const colorMap: Map<string, boolean> = new Map();
-    const pixels = frameData.pixels;
-    let colors: number[] = [];
-    for (let index = 0; index < pixels.length; index += 4) {
-        const r = pixels[index];
-        const g = pixels[index + 1];
-        const b = pixels[index + 2];
-        const a = pixels[index + 3];
-
-        const c = a === 0 ? 'a' : `${r},${g},${b}`;
-        if (!colorMap.has(c)) {
-            colorMap.set(c, true);
-            if (a !== 0) colors.push(r, g, b);
-        }
-    }
-
-    if (colorMap.size > 1 << colorDepth) {
-        const nq = new NeuQuant(colors, {
-            netsize: colorMap.has('a') ? 255 : 256,
-            samplefac: 1,
-        });
-        nq.buildColorMap();
-        colors = Array.from(nq.getColorMap());
-    }
-
-    frameData.isZip = colorMap.size > 1 << colorDepth;
-    frameData.hasTransparenc = !!colorMap.get('a');
-    frameData.palette = colors;
-    
-    return frameData;
-}
-
 function strTocode(str: string) {
     return str.split('').map(s => s.charCodeAt(0));
 }
 
 export default async function encoder(frames: IFrame[], time: number = 0, cb?: (progress: number) => any) {
     let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToFrameData(f)));
+    (window as any).imgDatas = imgDatas;
     let progress = 33;
     if (cb) cb(progress);
-    imgDatas = await encodeFramePixels(parseFramePalette(imgDatas));
+    imgDatas =  parseFramePalette(imgDatas);
+    imgDatas =  await encodeFramePixels(imgDatas);
+
     progress += 33;
     if (cb) cb(progress);
     const codes: number[] = [];
@@ -402,9 +373,10 @@ export default async function encoder(frames: IFrame[], time: number = 0, cb?: (
 
     // writeLogicalScreenDescriptor
     const firstImageData = imgDatas[0];
-
-    codes.push(firstImageData.w & 255, firstImageData.w >> 8);  // w
-    codes.push(firstImageData.h & 255, firstImageData.h >> 8);  // w
+    const w = firstImageData.w + firstImageData.x;
+    const h = firstImageData.h + firstImageData.y;
+    codes.push(w & 255, w >> 8);  // w
+    codes.push(h & 255, h >> 8);  // w
 
     const globalPalette = firstImageData.palette;
     let m = 1 << 7; // globalColorTableFlag
@@ -436,10 +408,9 @@ export default async function encoder(frames: IFrame[], time: number = 0, cb?: (
         codes.push(4); // byte size
         let m = 0;
         let displayType = 0;
-        if (data.x || data.y) {
-            displayType = 2;
-        }
-        if (data.hasTransparenc) {
+
+
+        if (data.x || data.y || data.hasTransparenc) {
             displayType = 1;
         }
 

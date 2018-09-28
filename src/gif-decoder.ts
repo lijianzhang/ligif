@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-25 10:43:02
+ * @Last Modified time: 2018-09-28 19:10:05
  */
 import Frame, { IFrameOpiton } from './frame';
 import './lzw-decode';
@@ -331,6 +331,7 @@ export default class GifDecoder {
             const len =  2 ** (colorSize + 1) * 3;
             frame.palette = this.readColorTable(len);
         } else {
+            frame.isGlobalPalette = true;
             frame.palette = this.palette;
         }
 
@@ -344,7 +345,6 @@ export default class GifDecoder {
                 this.read(len).forEach(v => data.push(v));
             } else {
                 frame.imgData = data;
-                // await this.decodeToPixels(frame, data, colorDepth);
                 break;
             }
         }

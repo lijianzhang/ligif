@@ -138,7 +138,7 @@ class Frame {
         if (this.prevFrame) {
             return this.prevFrame.width;
         }
-        return this.w;
+        return this.w + this.x;
     }
     /**
      * 第一帧高度
@@ -147,7 +147,7 @@ class Frame {
         if (this.prevFrame) {
             return this.prevFrame.height;
         }
-        return this.h;
+        return this.h + this.y;
     }
     toData() {
         return {
@@ -179,21 +179,20 @@ class Frame {
         let imgData = this.ctx.getImageData(0, 0, this.w, this.h);
         this.pixels.forEach((v, i) => imgData.data[i] = v);
         this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
-        if ((this.displayType === 1 || this.displayType === 2) && this.prevFrame) {
-            if (!this.prevFrame.ctx)
-                this.prevFrame.renderToCanvas(retry);
-            imgData = this.ctx.getImageData(0, 0, this.width, this.height);
-            const prevImageData = this.prevFrame.ctx.getImageData(0, 0, this.width, this.height);
-            for (var i = 0; i < imgData.data.length; i += 4) {
-                if (imgData.data[i + 3] == 0) {
-                    imgData.data[i] = prevImageData.data[i];
-                    imgData.data[i + 1] = prevImageData.data[i + 1];
-                    imgData.data[i + 2] = prevImageData.data[i + 2];
-                    imgData.data[i + 3] = prevImageData.data[i + 3];
-                }
-            }
-            this.ctx.putImageData(imgData, 0, 0);
-        }
+        // if ((this.displayType === 1 || this.displayType === 2) && this.prevFrame)  {
+        //     if (!this.prevFrame.ctx) this.prevFrame.renderToCanvas(retry);
+        //         imgData = this.ctx.getImageData(0, 0, this.width, this.height);
+        //         const prevImageData = this.prevFrame.ctx!.getImageData(0, 0, this.width, this.height);
+        //         for (var i = 0; i < imgData.data.length; i+=4) {
+        //             if (imgData.data[i+3] == 0) {
+        //                 imgData.data[i] = prevImageData.data[i];
+        //                 imgData.data[i+1] = prevImageData.data[i+1];
+        //                 imgData.data[i+2] = prevImageData.data[i+2];
+        //                 imgData.data[i+3] = prevImageData.data[i+3];
+        //             }
+        //         }
+        //         this.ctx.putImageData(imgData, 0, 0);
+        // }
         return this.ctx;
         // TODO: When displayType is equal to 3
     }
@@ -638,6 +637,7 @@ class GifDecoder {
             frame.palette = this.readColorTable(len);
         }
         else {
+            frame.isGlobalPalette = true;
             frame.palette = this.palette;
         }
         frame.colorDepth = this.readOne();
@@ -650,7 +650,6 @@ class GifDecoder {
             }
             else {
                 frame.imgData = data;
-                // await this.decodeToPixels(frame, data, colorDepth);
                 break;
             }
         }
@@ -1060,7 +1059,7 @@ workPool.registerWork('encode', (width, height, colorDepth, codes) => {
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-28 14:54:25
+ * @Last Modified time: 2018-09-29 01:16:56
  */
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 /**
@@ -1069,10 +1068,12 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
  * @param {frames[]} imageDatas[]
  */
 function optimizeImagePixels(frames) {
-    const [firstFrameData, ...otherFrameDatas] = frames;
-    const width = firstFrameData.w;
-    const lastPixels = firstFrameData.pixels.slice();
-    const datas = otherFrameDatas.map(frame => {
+    const width = frames[0].w + frames[0].x;
+    const height = frames[0].h + frames[0].y;
+    const lastPixels = new Array(width * height * 4);
+    const datas = frames.map(frame => {
+        let paletteMap = new Map();
+        let palette = [];
         let x = frame.x;
         let y = frame.y;
         let w = frame.w;
@@ -1086,8 +1087,10 @@ function optimizeImagePixels(frames) {
         let startOffset = 0;
         let maxStartOffset = w; //左边空白像素
         let maxEndOffset = w; // 右边空白像素
+        let isZip = false;
+        let transparencCount = 0;
         for (let index = 0; index < pixels.length; index += 4) {
-            const offset = ((Math.floor(index / 4 / w) + y) * width + x + ((index / 4) % w)) * 4;
+            const offset = ((y + Math.floor(index / (w * 4))) * width * 4) + ((index % (w * 4)) / 4 + x) * 4;
             const r1 = pixels[index];
             const r2 = lastPixels[offset];
             const g1 = pixels[index + 1];
@@ -1099,7 +1102,13 @@ function optimizeImagePixels(frames) {
                 startOffset = 0;
             }
             if ((r1 === r2 && g1 === g2 && b1 === b2) || a === 0) {
-                newPixels.push(0, 0, 0, 0);
+                if (a === 0) {
+                    newPixels.push(0, 0, 0, 0);
+                }
+                else {
+                    newPixels.push(r1, g1, b1, 0);
+                }
+                transparencCount += 1;
                 if (!isDone) {
                     startNum += 1;
                 }
@@ -1107,6 +1116,11 @@ function optimizeImagePixels(frames) {
                 endNum += 1;
             }
             else {
+                const c = `${r1},${g1},${b1}`;
+                if (!paletteMap.has(c)) {
+                    palette.push(r1, g1, b1);
+                    paletteMap.set(c, true);
+                }
                 newPixels.push(r1, g1, b1, a);
                 lastPixels[offset] = r1;
                 lastPixels[offset + 1] = g1;
@@ -1122,6 +1136,7 @@ function optimizeImagePixels(frames) {
                 maxEndOffset = endOffset < maxEndOffset ? endOffset : maxEndOffset;
             }
         }
+        transparencCount -= (startNum + endNum);
         const top = Math.floor(startNum / w);
         let start = 0;
         let end = pixels.length;
@@ -1147,12 +1162,22 @@ function optimizeImagePixels(frames) {
             x += maxStartOffset;
             w -= maxStartOffset + maxEndOffset;
         }
+        if (paletteMap.size > 256) {
+            const nq = new NeuQuant(palette, {
+                netsize: transparencCount > 0 ? 255 : 256,
+                samplefac: 1,
+            });
+            isZip = true;
+            nq.buildColorMap();
+            palette = Array.from(nq.getColorMap());
+        }
         return Object.assign({}, frame, { x,
             y,
             w,
-            h, pixels: newPixels });
+            isZip, hasTransparenc: transparencCount > 0, h,
+            palette, pixels: newPixels });
     });
-    return [firstFrameData].concat(datas);
+    return datas;
 }
 /**
  * 转换成压缩时需要的数据格式
@@ -1218,17 +1243,13 @@ function parseFramePalette(frameDatas) {
                 if (palette[x] === firstPalette[y] &&
                     palette[x + 1] === firstPalette[y + 1] &&
                     palette[x + 2] === firstPalette[y + 2]) {
-                    firstPaletteCopy.splice(y, 3);
-                    y -= 3;
                     hasSome = true;
                 }
             }
             if (!hasSome)
                 diffPallette.push(...palette.slice(x, x + 3));
         }
-        const isLocalPalette = (firstPalette.length + diffPallette.length) / 3
-            + ((!!info.hasTransparenc && !hasTransparenc) ? 1 : 0)
-            > 1 << Math.ceil(Math.log2(firstPalette.length / 3));
+        const isLocalPalette = (firstPalette.length + diffPallette.length) / 3 + ((!!info.hasTransparenc && !hasTransparenc) ? 1 : 0) > 1 << Math.ceil(Math.log2(firstPalette.length / 3));
         if (info.hasTransparenc) {
             // 添加透明色位置
             if (isLocalPalette) {
@@ -1242,6 +1263,7 @@ function parseFramePalette(frameDatas) {
                 }
                 else {
                     transparencIndex = firstPalette.length / 3;
+                    info.transparentColorIndex = transparencIndex;
                     firstPalette.push(0, 0, 0);
                     hasTransparenc = true;
                 }
@@ -1324,52 +1346,18 @@ function encodeFramePixels(frameDatas) {
         })));
     });
 }
-/**
- * 对颜色数超过设置的颜色质量参数, 减少颜色质量
- *
- * @param {frameData} IFrameData
- * @param {number} [colorDepth=8]
- *
- */
-function decreasePalette(frameData, colorDepth = 8) {
-    const colorMap = new Map();
-    const pixels = frameData.pixels;
-    let colors = [];
-    for (let index = 0; index < pixels.length; index += 4) {
-        const r = pixels[index];
-        const g = pixels[index + 1];
-        const b = pixels[index + 2];
-        const a = pixels[index + 3];
-        const c = a === 0 ? 'a' : `${r},${g},${b}`;
-        if (!colorMap.has(c)) {
-            colorMap.set(c, true);
-            if (a !== 0)
-                colors.push(r, g, b);
-        }
-    }
-    if (colorMap.size > 1 << colorDepth) {
-        const nq = new NeuQuant(colors, {
-            netsize: colorMap.has('a') ? 255 : 256,
-            samplefac: 1,
-        });
-        nq.buildColorMap();
-        colors = Array.from(nq.getColorMap());
-    }
-    frameData.isZip = colorMap.size > 1 << colorDepth;
-    frameData.hasTransparenc = !!colorMap.get('a');
-    frameData.palette = colors;
-    return frameData;
-}
 function strTocode(str) {
     return str.split('').map(s => s.charCodeAt(0));
 }
 function encoder(frames, time = 0, cb) {
     return __awaiter(this, void 0, void 0, function* () {
         let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToFrameData(f)));
+        window.imgDatas = imgDatas;
         let progress = 33;
         if (cb)
             cb(progress);
-        imgDatas = yield encodeFramePixels(parseFramePalette(imgDatas.map(d => decreasePalette(d))));
+        imgDatas = parseFramePalette(imgDatas);
+        imgDatas = yield encodeFramePixels(imgDatas);
         progress += 33;
         if (cb)
             cb(progress);
@@ -1377,8 +1365,10 @@ function encoder(frames, time = 0, cb) {
         codes.push(...strTocode('GIF89a')); //头部识别信息
         // writeLogicalScreenDescriptor
         const firstImageData = imgDatas[0];
-        codes.push(firstImageData.w & 255, firstImageData.w >> 8); // w
-        codes.push(firstImageData.h & 255, firstImageData.h >> 8); // w
+        const w = firstImageData.w + firstImageData.x;
+        const h = firstImageData.h + firstImageData.y;
+        codes.push(w & 255, w >> 8); // w
+        codes.push(h & 255, h >> 8); // w
         const globalPalette = firstImageData.palette;
         let m = 1 << 7; // globalColorTableFlag
         m += 0 << 4; // colorResolution
@@ -1407,10 +1397,7 @@ function encoder(frames, time = 0, cb) {
             codes.push(4); // byte size
             let m = 0;
             let displayType = 0;
-            if (data.x || data.y) {
-                displayType = 2;
-            }
-            if (data.hasTransparenc) {
+            if (data.x || data.y || data.hasTransparenc) {
                 displayType = 1;
             }
             m += displayType << 2;
@@ -1573,9 +1560,9 @@ document.getElementById('main').addEventListener('drop', function (e) {
     const gif = new GifDecoder();
     window.gif = gif;
     gif.readData(field, (progress) => console.log('progress:', progress)).then(gif => {
-        gif.frames.forEach(f => f.renderToCanvas().canvas);
+        gif.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
         setTimeout(() => {
-            const gIFEncoder = new GifEncoder(gif.frames[0].w, gif.frames[0].h);
+            const gIFEncoder = new GifEncoder(gif.width, gif.height);
             gIFEncoder.addFrames(gif.frames);
             gIFEncoder.encode((progress) => console.log(progress)).then(() => {
                 const img = document.createElement('img');

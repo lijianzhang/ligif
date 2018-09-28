@@ -11,9 +11,9 @@ document.getElementById('main').addEventListener('drop', function (e) {
     const gif = new GIFDecoder();
     (window as any).gif = gif;
     gif.readData(field, (progress) => console.log('progress:', progress)).then(gif => {
-       gif.frames.forEach(f =>  f.renderToCanvas().canvas);
+       gif.frames.forEach(f =>  document.body.appendChild(f.renderToCanvas().canvas));
         setTimeout(() => {
-            const gIFEncoder = new GIFEncoder(gif.frames[0].w, gif.frames[0].h);
+            const gIFEncoder = new GIFEncoder(gif.width, gif.height);
             gIFEncoder.addFrames(gif.frames);
             gIFEncoder.encode((progress) => console.log(progress)).then(() => {
                 const img = document.createElement('img');

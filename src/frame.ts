@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-16 00:10:40
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-23 23:31:19
+ * @Last Modified time: 2018-09-28 23:43:29
  */
 export interface IFrameOpiton {
     displayType?: number;
@@ -176,7 +176,7 @@ export default class Frame {
         if (this.prevFrame) {
             return this.prevFrame.width;
         }
-        return this.w;
+        return this.w + this.x;
     }
 
     /**
@@ -186,7 +186,7 @@ export default class Frame {
         if (this.prevFrame) {
             return this.prevFrame.height;
         }
-        return this.h;
+        return this.h + this.y;
     }
 
     /**
@@ -225,21 +225,21 @@ export default class Frame {
         this.pixels!.forEach((v, i) => imgData.data[i] = v);
         this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
 
-        if ((this.displayType === 1 || this.displayType === 2) && this.prevFrame)  {
+        // if ((this.displayType === 1 || this.displayType === 2) && this.prevFrame)  {
 
-            if (!this.prevFrame.ctx) this.prevFrame.renderToCanvas(retry);
-                imgData = this.ctx.getImageData(0, 0, this.width, this.height);
-                const prevImageData = this.prevFrame.ctx!.getImageData(0, 0, this.width, this.height);
-                for (var i = 0; i < imgData.data.length; i+=4) {
-                    if (imgData.data[i+3] == 0) {
-                        imgData.data[i] = prevImageData.data[i];
-                        imgData.data[i+1] = prevImageData.data[i+1];
-                        imgData.data[i+2] = prevImageData.data[i+2];
-                        imgData.data[i+3] = prevImageData.data[i+3];
-                    }
-                }
-                this.ctx.putImageData(imgData, 0, 0);
-        }
+        //     if (!this.prevFrame.ctx) this.prevFrame.renderToCanvas(retry);
+        //         imgData = this.ctx.getImageData(0, 0, this.width, this.height);
+        //         const prevImageData = this.prevFrame.ctx!.getImageData(0, 0, this.width, this.height);
+        //         for (var i = 0; i < imgData.data.length; i+=4) {
+        //             if (imgData.data[i+3] == 0) {
+        //                 imgData.data[i] = prevImageData.data[i];
+        //                 imgData.data[i+1] = prevImageData.data[i+1];
+        //                 imgData.data[i+2] = prevImageData.data[i+2];
+        //                 imgData.data[i+3] = prevImageData.data[i+3];
+        //             }
+        //         }
+        //         this.ctx.putImageData(imgData, 0, 0);
+        // }
 
         return this.ctx;
         // TODO: When displayType is equal to 3
