@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-25 10:29:14
+ * @Last Modified time: 2018-09-28 15:34:19
  */
 
 import NeuQuant from './neuquant';
@@ -41,11 +41,12 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
  * @param {frames[]} imageDatas[]
  */
 function optimizeImagePixels(frames: IFrameData[]) {
-    const [firstFrameData, ...otherFrameDatas] = frames;
+    const [firstFrameData] = frames;
     const width = firstFrameData.w;
-    const lastPixels = firstFrameData.pixels.slice();
+    const lastPixels = [];
 
-    const datas = otherFrameDatas.map(frame => {
+    const datas = frames.map(frame => {
+        let palette: number[] = [];
         let x = frame.x;
         let y = frame.y;
         let w = frame.w;
@@ -60,6 +61,8 @@ function optimizeImagePixels(frames: IFrameData[]) {
         let startOffset = 0;
         let maxStartOffset = w; //左边空白像素
         let maxEndOffset = w; // 右边空白像素
+        let hasTransparenc = false;
+        let isZip = false;
 
         for (let index = 0; index < pixels.length; index += 4) {
 
@@ -78,12 +81,14 @@ function optimizeImagePixels(frames: IFrameData[]) {
 
             if ((r1 === r2 && g1 === g2 && b1 === b2) || a === 0) {
                 newPixels.push(0, 0, 0, 0);
+                hasTransparenc = true;
                 if (!isDone) {
                     startNum += 1;
                 }
                 startOffset += 1;
                 endNum += 1;
             } else {
+                palette.push(r1, g1,b1);
                 newPixels.push(r1, g1, b1, a);
                 lastPixels[offset] = r1;
                 lastPixels[offset + 1] = g1;
@@ -128,17 +133,31 @@ function optimizeImagePixels(frames: IFrameData[]) {
             x += maxStartOffset;
             w -= maxStartOffset + maxEndOffset;
         }
+
+        if (palette.length / 3 > 256) {
+            const nq = new NeuQuant(palette, {
+                netsize: hasTransparenc ? 255 : 256,
+                samplefac: 1,
+            });
+            isZip = true;
+            nq.buildColorMap();
+            palette = Array.from(nq.getColorMap());
+        }
+
         return {
             ...frame,
             x,
             y,
             w,
+            isZip,
+            hasTransparenc,
             h,
+            palette,
             pixels: newPixels,
-        }
+        } as IFrameData;
     });
 
-    return [firstFrameData].concat(datas);
+    return datas;
 }
 
 
@@ -374,7 +393,7 @@ export default async function encoder(frames: IFrame[], time: number = 0, cb?: (
     let imgDatas = optimizeImagePixels(frames.map(f => transformFrameToFrameData(f)));
     let progress = 33;
     if (cb) cb(progress);
-    imgDatas = await encodeFramePixels(parseFramePalette(imgDatas.map(d => decreasePalette(d))));
+    imgDatas = await encodeFramePixels(parseFramePalette(imgDatas));
     progress += 33;
     if (cb) cb(progress);
     const codes: number[] = [];

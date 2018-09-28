@@ -71,6 +71,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
 - [x] 支持video转gif
 - [x] 支持控制循环次数
 - [ ] 支持有损压缩
+- [ ] 进一步优化无损压缩体积
 
 ### License
 

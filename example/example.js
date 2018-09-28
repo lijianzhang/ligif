@@ -1060,7 +1060,7 @@ workPool.registerWork('encode', (width, height, colorDepth, codes) => {
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-25 10:29:14
+ * @Last Modified time: 2018-09-28 14:54:25
  */
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 /**
@@ -1571,6 +1571,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
     e.preventDefault();
     const field = e.dataTransfer.files[0];
     const gif = new GifDecoder();
+    window.gif = gif;
     gif.readData(field, (progress) => console.log('progress:', progress)).then(gif => {
         gif.frames.forEach(f => f.renderToCanvas().canvas);
         setTimeout(() => {
@@ -1581,6 +1582,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
                 img.src = URL.createObjectURL(gIFEncoder.toBlob());
                 document.body.appendChild(img);
                 const b = new GifDecoder();
+                window.b = b;
                 b.readCodes(gIFEncoder.codes).then(() => {
                     b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
                 });

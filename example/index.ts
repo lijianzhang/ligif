@@ -9,6 +9,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
 
     const field = e.dataTransfer.files[0];
     const gif = new GIFDecoder();
+    (window as any).gif = gif;
     gif.readData(field, (progress) => console.log('progress:', progress)).then(gif => {
        gif.frames.forEach(f =>  f.renderToCanvas().canvas);
         setTimeout(() => {
@@ -19,6 +20,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
                 img.src = URL.createObjectURL(gIFEncoder.toBlob());
                 document.body.appendChild(img);
                 const b = new GIFDecoder();
+                (window as any).b = b;
                 b.readCodes(gIFEncoder.codes).then(() => {
                     b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
                 })
