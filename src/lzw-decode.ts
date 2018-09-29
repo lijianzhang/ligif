@@ -3,7 +3,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:20
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 16:27:58
+ * @Last Modified time: 2018-09-29 18:10:06
  */
 import workPool from './work';
 
@@ -20,6 +20,7 @@ workPool.registerWork('decode', (colorDepth: number, buffer: Uint8Array) => {
         private colorSize!: number;
     
         private dict!: Map<number, number[]>;
+        private dict2: Set<string> = new Set();
     
         private clearCode!: number;
     
@@ -36,14 +37,14 @@ workPool.registerWork('decode', (colorDepth: number, buffer: Uint8Array) => {
             this.clearCode = 1 << this.colorSize;
             this.endCode = this.clearCode + 1;
             this.colorSize += 1;
-            this.insertSeq([]);
-            this.insertSeq([]);
+            this.insertSeq([this.clearCode]);
+            this.insertSeq([this.endCode]);
         }
     
         private insertSeq(str: number[]) {
             const index = this.dict.size;
-            
             this.dict.set(index, str);
+            this.dict2.add(`this.colorSize: ${this.colorSize} codes: ${str.join(',')} index: ${index}`);
         }
     
         private getCodeSeq(code: number) {
@@ -116,7 +117,9 @@ workPool.registerWork('decode', (colorDepth: number, buffer: Uint8Array) => {
                     this.colorSize += 1;
                 }
             }
-    
+
+            console.log('dict2', this.dict2);
+            console.log('===============')
             return Uint8Array.from(outputs);
         }
      }

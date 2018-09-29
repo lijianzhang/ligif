@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-21 00:28:46
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 16:35:19
+ * @Last Modified time: 2018-09-29 11:19:24
  */
 
 class WorkPool {
@@ -98,5 +98,5 @@ class WorkPool {
 }
 
 const workPool = new WorkPool();
-
+(window as any).workPool = workPool;
 export default workPool;
