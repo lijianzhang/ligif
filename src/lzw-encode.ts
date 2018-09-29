@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 16:35:43
+ * @Last Modified time: 2018-09-29 18:10:44
  */
 
 export type Dictionary = Map<string | number, number>;
@@ -21,6 +21,7 @@ workPool.registerWork('encode', (width: number, height: number, colorDepth: numb
         colorSize!: number;
     
         dict: Dictionary = new Map<string, number>();
+        dict2: Dictionary = new Map<string, number>();
     
         clearCode!: number;
     
@@ -31,6 +32,8 @@ workPool.registerWork('encode', (width: number, height: number, colorDepth: numb
         remainingBits = 8;
     
         index = 0;
+
+        codes: number[] = [];
     
         init() {
             this.colorSize = this.defaultColorSize + 1;
@@ -47,49 +50,48 @@ workPool.registerWork('encode', (width: number, height: number, colorDepth: numb
         insertSeq(str: string | number) {
             const index = this.dict.size;
             this.dict.set(str, index);
+            this.dict2.set(str, index)
         }
     
-        getSeqCode(str: string) {
+        getSeqCode(str: string | number) {
             return this.dict.get(str);
         }
     
         encode(str: Uint8Array) {
-            let current;
-            let next;
-            let code;
-    
+            let prefixCode: string | number = '';
+
             let i = 0;
             this.pushCode(this.clearCode);
             while(i < str.length) {
-                current = str[i];
-                next = str[i + 1];
                 if (this.dict.size == 4096) {
                     this.pushCode(this.clearCode);
                     this.init();
-                }  else if (this.dict.size === (1 << this.colorSize) + 1) {
+                } else if (this.dict.size === (1 << this.colorSize) + 1) {
                     this.colorSize += 1;
                 }
-                while (next !== undefined && this.getSeqCode(`${current},${next}`) !== undefined) {
-                    current = `${current},${next}`;
-                    i += 1
-                    next = str[i + 1];
+                const currentCode = str[i];
+                const key = prefixCode !== '' ? `${prefixCode},${currentCode}` : currentCode;
+
+                if (this.getSeqCode(key) !== undefined && str[i + 1] !== undefined) {
+                    prefixCode = key;
+                } else {
+                    this.insertSeq(key);
+                    this.pushCode(this.getSeqCode(prefixCode));
+                    prefixCode = currentCode;
                 }
-                code = this.getSeqCode(current);
-                if (next !== undefined) {
-                    this.insertSeq(`${current},${next}`);   
-                }
-                this.pushCode(code);
                 i += 1;
-    
             }
+            this.pushCode(this.getSeqCode(prefixCode));
             this.pushCode(this.endCode);
+
             return this.buffers.slice(0, this.index + 1);
         }
     
         pushCode(code: number) {
+            this.codes.push(code);
             let colorSize = this.colorSize;
             let data = code;
-    
+
             while (colorSize >= 0) {
                 const size = Math.min(colorSize, this.remainingBits);
                 const c = this.buffers[this.index] | data << (8 - this.remainingBits) & 255;
