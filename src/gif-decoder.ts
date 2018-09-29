@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 21:52:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-28 19:10:05
+ * @Last Modified time: 2018-09-29 22:33:05
  */
 import Frame, { IFrameOpiton } from './frame';
 import './lzw-decode';
@@ -93,7 +93,7 @@ export default class GifDecoder {
         while(!this.loaded) {
             this.readExtension();
         }
-
+        // this.frames = this.frames.slice(0, 2);
         await this.parsePixels();
         if (this.next) this.next(this);
     }

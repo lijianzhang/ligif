@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-29 18:10:44
+ * @Last Modified time: 2018-09-29 21:23:23
  */
 
 export type Dictionary = Map<string | number, number>;
@@ -63,7 +63,7 @@ workPool.registerWork('encode', (width: number, height: number, colorDepth: numb
             let i = 0;
             this.pushCode(this.clearCode);
             while(i < str.length) {
-                if (this.dict.size == 4096) {
+                if (this.dict.size == 4097) {
                     this.pushCode(this.clearCode);
                     this.init();
                 } else if (this.dict.size === (1 << this.colorSize) + 1) {

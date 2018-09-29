@@ -19,7 +19,8 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [
-    "src/**/*",
+    "src/core/**/*",
+    "src/interface/**/*",
   ],
   "exclude": [
     ".git",

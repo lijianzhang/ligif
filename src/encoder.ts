@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-29 01:16:56
+ * @Last Modified time: 2018-09-30 00:10:55
  */
 
 import NeuQuant from './neuquant';
@@ -53,6 +53,7 @@ function optimizeImagePixels(frames: IFrameData[]) {
         let w = frame.w;
         let h = frame.h;
         let pixels = frame.pixels;
+        
         let newPixels:number[] = [];
 
         // let alphaList: number[] = [];
@@ -81,13 +82,15 @@ function optimizeImagePixels(frames: IFrameData[]) {
                 startOffset = 0;
             }
 
-            if ((r1 === r2 && g1 === g2 && b1 === b2) || a === 0) {
+            const diff = (Math.abs(r1 - r2) < 1 && Math.abs(g1 - g2) < 1 && Math.abs(b1 - b2) < 1);
+            if (diff || a === 0) {
                 if (a === 0) {
                     newPixels.push(0, 0, 0, 0);
                 } else {
                     newPixels.push(r1, g1, b1, 0);
                 }
                 transparencCount += 1;
+
                 if (!isDone) {
                     startNum += 1;
                 }
@@ -114,13 +117,15 @@ function optimizeImagePixels(frames: IFrameData[]) {
             }
         }
         transparencCount -= (startNum + endNum);
-        const top = Math.floor(startNum / w);;
+        console.log('startNum', startNum, 'w', w);
+        const top = Math.floor(startNum / w);
+        console.log('top', top);
         let start = 0;
         let end = pixels.length;
 
         if (top) {
             start = top * w * 4;
-            y = top;
+            y -= top;
             h -= top;
         }
 
@@ -408,7 +413,7 @@ export default async function encoder(frames: IFrame[], time: number = 0, cb?: (
         codes.push(4); // byte size
         let m = 0;
         let displayType = 0;
-
+        
 
         if (data.x || data.y || data.hasTransparenc) {
             displayType = 1;

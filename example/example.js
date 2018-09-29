@@ -202,7 +202,7 @@ class Frame {
  * @Author: lijianzhang
  * @Date: 2018-09-21 00:28:46
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 16:35:19
+ * @Last Modified time: 2018-09-29 11:19:24
  */
 class WorkPool {
     constructor() {
@@ -297,16 +297,18 @@ class WorkPool {
     }
 }
 const workPool = new WorkPool();
+window.workPool = workPool;
 
 /*
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:20
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 16:27:58
+ * @Last Modified time: 2018-09-29 18:10:06
  */
 workPool.registerWork('decode', (colorDepth, buffer) => {
     class LzwDecode {
         constructor(colorDepth) {
+            this.dict2 = new Set();
             this.index = 0;
             this.remainingBits = 8;
             this.codes = [];
@@ -322,12 +324,13 @@ workPool.registerWork('decode', (colorDepth, buffer) => {
             this.clearCode = 1 << this.colorSize;
             this.endCode = this.clearCode + 1;
             this.colorSize += 1;
-            this.insertSeq([]);
-            this.insertSeq([]);
+            this.insertSeq([this.clearCode]);
+            this.insertSeq([this.endCode]);
         }
         insertSeq(str) {
             const index = this.dict.size;
             this.dict.set(index, str);
+            this.dict2.add(`this.colorSize: ${this.colorSize} codes: ${str.join(',')} index: ${index}`);
         }
         getCodeSeq(code) {
             return this.dict.get(code);
@@ -387,6 +390,8 @@ workPool.registerWork('decode', (colorDepth, buffer) => {
                     this.colorSize += 1;
                 }
             }
+            console.log('dict2', this.dict2);
+            console.log('===============');
             return Uint8Array.from(outputs);
         }
     }
@@ -503,6 +508,7 @@ class GifDecoder {
             while (!this.loaded) {
                 this.readExtension();
             }
+            // this.frames = this.frames.slice(0, 2);
             yield this.parsePixels();
             if (this.next)
                 this.next(this);
@@ -973,14 +979,16 @@ class NeuQuant {
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-24 16:35:43
+ * @Last Modified time: 2018-09-29 21:23:23
  */
 workPool.registerWork('encode', (width, height, colorDepth, codes) => {
     class LzwEncoder {
         constructor(width, height, colorDepth) {
             this.dict = new Map();
+            this.dict2 = new Map();
             this.remainingBits = 8;
             this.index = 0;
+            this.codes = [];
             this.defaultColorSize = Math.max(2, colorDepth);
             this.buffers = new Uint8Array(width * height + 100);
             this.init();
@@ -999,42 +1007,41 @@ workPool.registerWork('encode', (width, height, colorDepth, codes) => {
         insertSeq(str) {
             const index = this.dict.size;
             this.dict.set(str, index);
+            this.dict2.set(str, index);
         }
         getSeqCode(str) {
             return this.dict.get(str);
         }
         encode(str) {
-            let current;
-            let next;
-            let code;
+            let prefixCode = '';
             let i = 0;
             this.pushCode(this.clearCode);
             while (i < str.length) {
-                current = str[i];
-                next = str[i + 1];
-                if (this.dict.size == 4096) {
+                if (this.dict.size == 4097) {
                     this.pushCode(this.clearCode);
                     this.init();
                 }
                 else if (this.dict.size === (1 << this.colorSize) + 1) {
                     this.colorSize += 1;
                 }
-                while (next !== undefined && this.getSeqCode(`${current},${next}`) !== undefined) {
-                    current = `${current},${next}`;
-                    i += 1;
-                    next = str[i + 1];
+                const currentCode = str[i];
+                const key = prefixCode !== '' ? `${prefixCode},${currentCode}` : currentCode;
+                if (this.getSeqCode(key) !== undefined && str[i + 1] !== undefined) {
+                    prefixCode = key;
                 }
-                code = this.getSeqCode(current);
-                if (next !== undefined) {
-                    this.insertSeq(`${current},${next}`);
+                else {
+                    this.insertSeq(key);
+                    this.pushCode(this.getSeqCode(prefixCode));
+                    prefixCode = currentCode;
                 }
-                this.pushCode(code);
                 i += 1;
             }
+            this.pushCode(this.getSeqCode(prefixCode));
             this.pushCode(this.endCode);
             return this.buffers.slice(0, this.index + 1);
         }
         pushCode(code) {
+            this.codes.push(code);
             let colorSize = this.colorSize;
             let data = code;
             while (colorSize >= 0) {
@@ -1059,7 +1066,7 @@ workPool.registerWork('encode', (width, height, colorDepth, codes) => {
  * @Author: lijianzhang
  * @Date: 2018-09-22 18:14:54
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-29 01:16:56
+ * @Last Modified time: 2018-09-30 00:10:55
  */
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 /**
@@ -1101,7 +1108,8 @@ function optimizeImagePixels(frames) {
             if ((index / 4) % w === 0) {
                 startOffset = 0;
             }
-            if ((r1 === r2 && g1 === g2 && b1 === b2) || a === 0) {
+            const diff = (Math.abs(r1 - r2) < 1 && Math.abs(g1 - g2) < 1 && Math.abs(b1 - b2) < 1);
+            if (diff || a === 0) {
                 if (a === 0) {
                     newPixels.push(0, 0, 0, 0);
                 }
@@ -1137,12 +1145,14 @@ function optimizeImagePixels(frames) {
             }
         }
         transparencCount -= (startNum + endNum);
+        console.log('startNum', startNum, 'w', w);
         const top = Math.floor(startNum / w);
+        console.log('top', top);
         let start = 0;
         let end = pixels.length;
         if (top) {
             start = top * w * 4;
-            y = top;
+            y -= top;
             h -= top;
         }
         const bottom = Math.floor(endNum / w);

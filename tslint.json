@@ -39,6 +39,7 @@
         "prefer-type-cast": false,
         "no-default-export": false,
         "no-shadowed-variable":false,
+        "no-bitwise": false,
         "no-any": false,
         "no-import-side-effect": [true, {"ignore-module": "(\\.html|\\.css|\\.less|reflect-metadata)$"}],
         "import-name": false,
