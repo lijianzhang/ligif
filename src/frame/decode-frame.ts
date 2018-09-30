@@ -2,14 +2,13 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:53:35
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 04:13:12
+ * @Last Modified time: 2018-09-30 13:42:49
  */
 
 import BaseFrame from './base-frame';
-import Worker from 'worker!*../workers/decode-code-to-pixels';
-
-export default class DecodeFrame extends BaseFrame
-    implements LiGif.IDecodeFrame {
+import '../lzw-decode';
+import workPool from '../work-pool';
+export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame {
     public preFrame?: DecodeFrame;
 
     public imgData = [];
@@ -25,6 +24,7 @@ export default class DecodeFrame extends BaseFrame
         if (this.preFrame) {
             return this.preFrame.width;
         }
+
         return this.w + this.x;
     }
 
@@ -39,15 +39,14 @@ export default class DecodeFrame extends BaseFrame
         return this.h + this.y;
     }
 
-    public decodeToPixels() {
-        const worker = new Worker();
-        worker.postMessage({
-            imgData: this.imgData,
+    public async decodeToPixels() {
+        const array = Uint8Array.from(this.imgData);
+        const pixels = await workPool.executeWork('decode', [{ imgData: array,
             colorDepth: this.colorDepth,
             palette: this.palette,
             transparentColorIndex: this.transparentColorIndex,
-            isInterlace: this.isInterlace
-        });
+            isInterlace: this.isInterlace }], [array.buffer]);
+        this.pixels = pixels;
     }
 
     /**

@@ -66,7 +66,7 @@ document.getElementById('main').addEventListener('drop', function (e) {
 
 ### TODO
 
-- [x] 增加进度回调
+- [ ] 增加进度回调
 - [ ] 卡线程操作都改为worker(会导致耗时增加,先不做)
 - [x] 支持video转gif
 - [x] 支持控制循环次数

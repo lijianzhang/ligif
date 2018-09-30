@@ -31,8 +31,10 @@
           }],
         "no-suspicious-comment": false,
         "align": false,
+        "prefer-array-literal": false,
         "variable-name": false,
         "function-name":false,
+        "no-import-side-effect": false,
         "insecure-random": false,
         "no-redundant-jsdoc": false,
         "prefer-for-of": false,
@@ -41,7 +43,6 @@
         "no-shadowed-variable":false,
         "no-bitwise": false,
         "no-any": false,
-        "no-import-side-effect": [true, {"ignore-module": "(\\.html|\\.css|\\.less|reflect-metadata)$"}],
         "import-name": false,
         
         "typedef": false,

@@ -22,8 +22,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "rollup": "^0.56.5",
-    "rollup-plugin-bundle-worker": "^0.1.0",
+    "rollup": "^0.66.2",
     "rollup-plugin-commonjs": "^9.0.0",
     "rollup-plugin-serve": "^0.6.0",
     "rollup-plugin-typescript2": "^0.17.0",

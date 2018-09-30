@@ -12,4 +12,8 @@ export default class EncodeFrame extends BaseFrame
     public indexs = [];
 
     public displayType = 0;
+
+    public isZip = false;
+
+    public hasTransparenc = false;
 }

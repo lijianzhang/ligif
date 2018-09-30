@@ -107,6 +107,23 @@ declare namespace LiGif {
          * @memberof IEncodeFrame
          */
         indexs: number[];
+
+        /**
+         * 颜色是否压缩过
+         *
+         * @type {boolean}
+         * @memberof IEncodeFrame
+         */
+        isZip: boolean;
+
+
+        /**
+         * 是否有透明色
+         *
+         * @type {boolean}
+         * @memberof IDecodeFrame
+         */
+        hasTransparenc: boolean;
     }
 
 
@@ -134,5 +151,6 @@ declare namespace LiGif {
          * @memberof IDecodeFrame
          */
         preFrame?: IDecodeFrame;
+
     }
 }

@@ -2,43 +2,43 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-29 21:23:23
+ * @Last Modified time: 2018-09-30 11:44:04
  */
 
 export type Dictionary = Map<string | number, number>;
-import workPool from './work';
+import workPool from './work-pool';
 
-workPool.registerWork('encode', (width: number, height: number, colorDepth: number, codes: Uint8Array) => {
+workPool.registerWork('encode', (width: number, height: number, colorDepth: number, codes: Uint8Array) => { // tslint:disable-line
     class LzwEncoder {
         constructor(width: number, height: number, colorDepth: number) {
             this.defaultColorSize = Math.max(2, colorDepth);
             this.buffers = new Uint8Array(width * height + 100);
             this.init();
         }
-    
-        defaultColorSize: number;
-    
-        colorSize!: number;
-    
-        dict: Dictionary = new Map<string, number>();
-        dict2: Dictionary = new Map<string, number>();
-    
-        clearCode!: number;
-    
-        endCode!: number;
-    
-        buffers: Uint8Array;
-    
-        remainingBits = 8;
-    
-        index = 0;
 
-        codes: number[] = [];
-    
-        init() {
+        public defaultColorSize: number;
+
+        public colorSize!: number;
+
+        public dict: Dictionary = new Map<string, number>();
+        public dict2: Dictionary = new Map<string, number>();
+
+        public clearCode!: number;
+
+        public endCode!: number;
+
+        public buffers: Uint8Array;
+
+        public remainingBits = 8;
+
+        public index = 0;
+
+        public codes: number[] = [];
+
+        public init() {
             this.colorSize = this.defaultColorSize + 1;
             this.dict.clear();
-            for (let index = 0; index < 2 ** this.defaultColorSize; index++) {
+            for (let index = 0; index < 2 ** this.defaultColorSize; index += 1) {
                 this.insertSeq(index);
             }
             this.clearCode = 1 << this.defaultColorSize;
@@ -46,24 +46,24 @@ workPool.registerWork('encode', (width: number, height: number, colorDepth: numb
             this.insertSeq(this.clearCode);
             this.insertSeq(this.endCode);
         }
-    
-        insertSeq(str: string | number) {
+
+        public insertSeq(str: string | number) {
             const index = this.dict.size;
             this.dict.set(str, index);
-            this.dict2.set(str, index)
+            this.dict2.set(str, index);
         }
-    
-        getSeqCode(str: string | number) {
+
+        public getSeqCode(str: string | number) {
             return this.dict.get(str);
         }
-    
-        encode(str: Uint8Array) {
+
+        public encode(str: Uint8Array) {
             let prefixCode: string | number = '';
 
             let i = 0;
             this.pushCode(this.clearCode);
-            while(i < str.length) {
-                if (this.dict.size == 4097) {
+            while (i < str.length) {
+                if (this.dict.size === 4097) {
                     this.pushCode(this.clearCode);
                     this.init();
                 } else if (this.dict.size === (1 << this.colorSize) + 1) {
@@ -86,8 +86,8 @@ workPool.registerWork('encode', (width: number, height: number, colorDepth: numb
 
             return this.buffers.slice(0, this.index + 1);
         }
-    
-        pushCode(code: number) {
+
+        public pushCode(code: number) {
             this.codes.push(code);
             let colorSize = this.colorSize;
             let data = code;
@@ -107,5 +107,6 @@ workPool.registerWork('encode', (width: number, height: number, colorDepth: numb
         }
     }
     const encode = new LzwEncoder(width, height, colorDepth);
+
     return encode.encode(codes);
-})
+});

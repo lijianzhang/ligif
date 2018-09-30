@@ -2,15 +2,17 @@
  * @Author: lijianzhang
  * @Date: 2018-09-21 00:28:46
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-29 11:19:24
+ * @Last Modified time: 2018-09-30 11:38:45
  */
 
 class WorkPool {
+
+    public workScripts: Map<string, Blob> = new Map();
+
+    public pools: { work: Worker; isUse: boolean; name: string }[] = [];
+
+    public queue: {name: string; args: any[]; res: Function; rej: Function; transferable?: any[]}[] = [];
     private maxNum = navigator.hardwareConcurrency;
-
-    workScripts: Map<string, Blob> = new Map();
-
-    pools: { work: Worker; isUse: boolean, name: string }[] = [];
 
     public registerWork(name: string, fn: Function | Blob) {
         let blob: Blob;
@@ -29,35 +31,36 @@ class WorkPool {
         }
     }
 
-    queue: {name:string; args: any[], res: Function, rej: Function, transferable?: any[]}[] = [];    
-
     /**
-     * 
+     *
      */
     public executeWork(name: string, args: any[], transferable?: any[], res?: Function, rej?: Function) {
         if (this.pools.length < this.maxNum) {
             const blob = this.workScripts.get(name);
             if (!blob) throw new Error('无效的name');
             const work = new Worker(URL.createObjectURL(blob));
-            this.pools.push({ name, work, isUse: true })
-            return this.completeHandle(work, args, transferable, res, rej);;
+            this.pools.push({ name, work, isUse: true });
+
+            return this.completeHandle(work, args, transferable, res, rej);
         }
         const pools = this.pools.filter(p => !p.isUse);
         if (pools.length) {
             const pool = pools.find(p => p.name === name);
             if (pool) {
                 pool.isUse = true;
+
                 return this.completeHandle(pool.work, args, transferable, res, rej);
             }  else {
                 const index = this.pools.findIndex(p => !p.isUse);
                 this.pools[index].work.terminate();
                 this.pools.splice(index, 1);
+
                 return this.executeWork(name, args, transferable, res, rej);
             }
         } else {
-            return new Promise((res, rej) => {
+            return new Promise((res, rej) => { // tslint:disable-line
                 this.queue.push({ name, args, transferable, res, rej});
-            })
+            });
         }
     }
 
@@ -74,25 +77,26 @@ class WorkPool {
         work.postMessage(args, transferable);
         if (res && rej) {
             work.onmessage = (v) =>  {
-                res(v.data)
-                this.stopWork(work)
+                res(v.data);
+                this.stopWork(work);
             };
             work.onerror = (e) => {
                 rej(e.message);
-                this.stopWork(work)
-            }
+                this.stopWork(work);
+            };
+
             return work;
         } else {
             return new Promise<T>((res, rej) => {
                 work.onmessage = (v) =>  {
-                    res(v.data)
-                    this.stopWork(work)
+                    res(v.data);
+                    this.stopWork(work);
                 };
                 work.onerror = (e) => {
                     rej(e.message);
-                    this.stopWork(work)
-                }
-            })
+                    this.stopWork(work);
+                };
+            });
         }
     }
 }
