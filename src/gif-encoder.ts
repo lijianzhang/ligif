@@ -7,7 +7,7 @@ import * as CONSTANTS from './constants';
  * @Author: lijianzhang
  * @Date: 2018-09-30 09:35:57
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 14:15:59
+ * @Last Modified time: 2018-09-30 16:36:14
  */
 export interface IDefalutFrameData {
     pixels: number[];
@@ -296,6 +296,16 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
         };
     }
 
+    // from: https://blog.csdn.net/jaych/article/details/51137341?utm_source=copy
+    private colourDistance(rgb1: [number, number, number], rgb2: [number, number, number]) {
+      const rmean = (rgb1[0] + rgb2[0]) / 2;
+      const r = rgb1[0] - rgb2[0];
+      const g = rgb1[1] - rgb2[1];
+      const b = rgb1[2] - rgb2[2];
+
+      return Math.sqrt((((rmean + 512) * r * r) >> 8) + g * g * 4 + (((767 - rmean) * b * b) >> 8));
+    }
+
     private optimizeImagePixels() { // tslint:disable-line
         const lastPixels = [];
 
@@ -336,8 +346,10 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
                     startOffset = 0;
                 }
 
-                const diff = (Math.abs(r1 - r2) < 5 && Math.abs(g1 - g2) < 5 && Math.abs(b1 - b2) < 5);
-                if (diff || a === 0) {
+
+                const diff = this.colourDistance([r1, g1, b1], [r2, g2, b2]);
+
+                if (diff < 30 || a === 0) {
                     if (a === 0) {
                         newPixels.push(0, 0, 0, 0);
                     } else {

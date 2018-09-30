@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 11:51:55
+ * @Last Modified time: 2018-09-30 17:39:47
  */
 
 export type Dictionary = Map<string | number, number>;
@@ -151,7 +151,7 @@ workPool.registerWork('decode', (data) => {
                 for (let i = start[pass]; i < data.h; i += inc[pass]) {
                     for (let j = 0; j < data.w; j += 1) {
                         const idx = (i - 1) * data.w * 4 + j * 4;
-                        const k = data[index];
+                        const k = codes[index];
                         pixels[idx] = data.palette[k * 3];
                         pixels[idx + 1] = data.palette[k * 3 + 1];
                         pixels[idx + 2] = data.palette[k * 3 + 2];
@@ -160,6 +160,7 @@ workPool.registerWork('decode', (data) => {
                     }
                 }
             }
+
         }
 
         return pixels;

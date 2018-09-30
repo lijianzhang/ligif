@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:57:06
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 13:39:01
+ * @Last Modified time: 2018-09-30 16:43:00
  */
 import * as CONSTANT from './constants';
 import DecodeFrame from './frame/decode-frame';
@@ -348,7 +348,6 @@ import DecodeFrame from './frame/decode-frame';
             len = this.readOne();
         }
         frame.imgData = data;
-
         if (frame.w && frame.h) this.frames.push(frame);
 
     }

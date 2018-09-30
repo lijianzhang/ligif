@@ -17,8 +17,7 @@ function test(e) {
     const gif = new GIFDecoder();
     (window as any).gif = gif;
     gif.readData(field).then(gif => {
-       gif.frames.forEach(f =>  f.renderToCanvas().canvas);
-        setTimeout(() => {
+       gif.frames.forEach(f =>  document.body.appendChild(f.renderToCanvas().canvas));
             const gIFEncoder = new GIFEncoder(gif.width, gif.height);
             gIFEncoder.addFrames(gif.frames.map(f => ({ img: f.ctx!.canvas, delay: f.delay })));
             gIFEncoder.encode().then(() => {
@@ -29,8 +28,6 @@ function test(e) {
                 (window as any).b = b;
             });
         });
-
-    });
 }
 
 const img1 = document.getElementById('img1') as HTMLImageElement;

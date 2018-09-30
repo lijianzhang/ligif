@@ -162,7 +162,7 @@
      * @Author: lijianzhang
      * @Date: 2018-09-15 19:40:17
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-09-30 11:51:55
+     * @Last Modified time: 2018-09-30 17:39:47
      */
     workPool.registerWork('decode', (data) => {
         class LzwDecode {
@@ -271,7 +271,7 @@
                     for (let i = start[pass]; i < data.h; i += inc[pass]) {
                         for (let j = 0; j < data.w; j += 1) {
                             const idx = (i - 1) * data.w * 4 + j * 4;
-                            const k = data[index];
+                            const k = codes[index];
                             pixels[idx] = data.palette[k * 3];
                             pixels[idx + 1] = data.palette[k * 3 + 1];
                             pixels[idx + 2] = data.palette[k * 3 + 2];
@@ -290,7 +290,7 @@
      * @Author: lijianzhang
      * @Date: 2018-09-30 02:53:35
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-09-30 13:42:49
+     * @Last Modified time: 2018-09-30 16:44:39
      */
     class DecodeFrame extends BaseFrame {
         constructor() {
@@ -322,6 +322,8 @@
                 const pixels = yield workPool.executeWork('decode', [{ imgData: array,
                         colorDepth: this.colorDepth,
                         palette: this.palette,
+                        h: this.h,
+                        w: this.w,
                         transparentColorIndex: this.transparentColorIndex,
                         isInterlace: this.isInterlace }], [array.buffer]);
                 this.pixels = pixels;
@@ -344,25 +346,31 @@
             this.ctx = canvas.getContext('2d');
             canvas.width = this.width;
             canvas.height = this.height;
-            let imgData = this.ctx.getImageData(0, 0, this.w, this.h);
+            const imgData = this.ctx.getImageData(0, 0, this.w, this.h);
             this.pixels.forEach((v, i) => (imgData.data[i] = v));
             this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
-            if ((this.displayType === 1 || this.displayType === 2) &&
-                this.preFrame) {
-                if (!this.preFrame.ctx)
-                    this.preFrame.renderToCanvas(retry);
-                imgData = this.ctx.getImageData(0, 0, this.width, this.height);
-                const prevImageData = this.preFrame.ctx.getImageData(0, 0, this.width, this.height);
-                for (let i = 0; i < imgData.data.length; i += 4) {
-                    if (imgData.data[i + 3] === 0) {
-                        imgData.data[i] = prevImageData.data[i];
-                        imgData.data[i + 1] = prevImageData.data[i + 1];
-                        imgData.data[i + 2] = prevImageData.data[i + 2];
-                        imgData.data[i + 3] = prevImageData.data[i + 3];
-                    }
-                }
-                this.ctx.putImageData(imgData, 0, 0);
-            }
+            // if (
+            //     (this.displayType === 1 || this.displayType === 2) &&
+            //     this.preFrame
+            // ) {
+            //     if (!this.preFrame.ctx) this.preFrame.renderToCanvas(retry);
+            //     imgData = this.ctx.getImageData(0, 0, this.width, this.height);
+            //     const prevImageData = this.preFrame.ctx!.getImageData(
+            //         0,
+            //         0,
+            //         this.width,
+            //         this.height
+            //     );
+            //     for (let i = 0; i < imgData.data.length; i += 4) {
+            //         if (imgData.data[i + 3] === 0) {
+            //             imgData.data[i] = prevImageData.data[i];
+            //             imgData.data[i + 1] = prevImageData.data[i + 1];
+            //             imgData.data[i + 2] = prevImageData.data[i + 2];
+            //             imgData.data[i + 3] = prevImageData.data[i + 3];
+            //         }
+            //     }
+            //     this.ctx.putImageData(imgData, 0, 0);
+            // }
             return this.ctx;
             // TODO: When displayType is equal to 3 or 4
         }
@@ -1191,6 +1199,14 @@
                 pixels: [...ctx.getImageData(0, 0, this.w, this.h).data]
             };
         }
+        // from: https://blog.csdn.net/jaych/article/details/51137341?utm_source=copy
+        colourDistance(rgb1, rgb2) {
+            const rmean = (rgb1[0] + rgb2[0]) / 2;
+            const r = rgb1[0] - rgb2[0];
+            const g = rgb1[1] - rgb2[1];
+            const b = rgb1[2] - rgb2[2];
+            return Math.sqrt((((rmean + 512) * r * r) >> 8) + g * g * 4 + (((767 - rmean) * b * b) >> 8));
+        }
         optimizeImagePixels() {
             const lastPixels = [];
             this.frames.forEach(frame => {
@@ -1223,8 +1239,8 @@
                     if ((index / 4) % w === 0) {
                         startOffset = 0;
                     }
-                    const diff = (Math.abs(r1 - r2) < 5 && Math.abs(g1 - g2) < 5 && Math.abs(b1 - b2) < 5);
-                    if (diff || a === 0) {
+                    const diff = this.colourDistance([r1, g1, b1], [r2, g2, b2]);
+                    if (diff < 30 || a === 0) {
                         if (a === 0) {
                             newPixels.push(0, 0, 0, 0);
                         }
@@ -1449,17 +1465,15 @@
         const gif = new GifDecoder();
         window.gif = gif;
         gif.readData(field).then(gif => {
-            gif.frames.forEach(f => f.renderToCanvas().canvas);
-            setTimeout(() => {
-                const gIFEncoder = new GifEncoder(gif.width, gif.height);
-                gIFEncoder.addFrames(gif.frames.map(f => ({ img: f.ctx.canvas, delay: f.delay })));
-                gIFEncoder.encode().then(() => {
-                    const img = document.createElement('img');
-                    img.src = URL.createObjectURL(gIFEncoder.toBlob());
-                    document.body.appendChild(img);
-                    const b = new GifDecoder();
-                    window.b = b;
-                });
+            gif.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
+            const gIFEncoder = new GifEncoder(gif.width, gif.height);
+            gIFEncoder.addFrames(gif.frames.map(f => ({ img: f.ctx.canvas, delay: f.delay })));
+            gIFEncoder.encode().then(() => {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(gIFEncoder.toBlob());
+                document.body.appendChild(img);
+                const b = new GifDecoder();
+                window.b = b;
             });
         });
     }
