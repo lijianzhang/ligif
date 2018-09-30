@@ -162,7 +162,7 @@
      * @Author: lijianzhang
      * @Date: 2018-09-15 19:40:17
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-09-30 17:39:47
+     * @Last Modified time: 2018-09-30 17:46:25
      */
     workPool.registerWork('decode', (data) => {
         class LzwDecode {
@@ -267,7 +267,7 @@
                 const start = [0, 4, 2, 1];
                 const inc = [8, 8, 4, 2];
                 let index = 0;
-                for (let pass = 0; pass < 4; pass += 1) {
+                for (let pass = 0; pass < 4; pass += 1) { // from https://juejin.im/entry/59cc6fa151882550b3549bce
                     for (let i = start[pass]; i < data.h; i += inc[pass]) {
                         for (let j = 0; j < data.w; j += 1) {
                             const idx = (i - 1) * data.w * 4 + j * 4;
@@ -290,7 +290,7 @@
      * @Author: lijianzhang
      * @Date: 2018-09-30 02:53:35
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-09-30 16:44:39
+     * @Last Modified time: 2018-09-30 17:43:59
      */
     class DecodeFrame extends BaseFrame {
         constructor() {
@@ -346,31 +346,25 @@
             this.ctx = canvas.getContext('2d');
             canvas.width = this.width;
             canvas.height = this.height;
-            const imgData = this.ctx.getImageData(0, 0, this.w, this.h);
+            let imgData = this.ctx.getImageData(0, 0, this.w, this.h);
             this.pixels.forEach((v, i) => (imgData.data[i] = v));
             this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
-            // if (
-            //     (this.displayType === 1 || this.displayType === 2) &&
-            //     this.preFrame
-            // ) {
-            //     if (!this.preFrame.ctx) this.preFrame.renderToCanvas(retry);
-            //     imgData = this.ctx.getImageData(0, 0, this.width, this.height);
-            //     const prevImageData = this.preFrame.ctx!.getImageData(
-            //         0,
-            //         0,
-            //         this.width,
-            //         this.height
-            //     );
-            //     for (let i = 0; i < imgData.data.length; i += 4) {
-            //         if (imgData.data[i + 3] === 0) {
-            //             imgData.data[i] = prevImageData.data[i];
-            //             imgData.data[i + 1] = prevImageData.data[i + 1];
-            //             imgData.data[i + 2] = prevImageData.data[i + 2];
-            //             imgData.data[i + 3] = prevImageData.data[i + 3];
-            //         }
-            //     }
-            //     this.ctx.putImageData(imgData, 0, 0);
-            // }
+            if ((this.displayType === 1 || this.displayType === 2) &&
+                this.preFrame) {
+                if (!this.preFrame.ctx)
+                    this.preFrame.renderToCanvas(retry);
+                imgData = this.ctx.getImageData(0, 0, this.width, this.height);
+                const prevImageData = this.preFrame.ctx.getImageData(0, 0, this.width, this.height);
+                for (let i = 0; i < imgData.data.length; i += 4) {
+                    if (imgData.data[i + 3] === 0) {
+                        imgData.data[i] = prevImageData.data[i];
+                        imgData.data[i + 1] = prevImageData.data[i + 1];
+                        imgData.data[i + 2] = prevImageData.data[i + 2];
+                        imgData.data[i + 3] = prevImageData.data[i + 3];
+                    }
+                }
+                this.ctx.putImageData(imgData, 0, 0);
+            }
             return this.ctx;
             // TODO: When displayType is equal to 3 or 4
         }

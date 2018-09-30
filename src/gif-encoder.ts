@@ -7,7 +7,7 @@ import * as CONSTANTS from './constants';
  * @Author: lijianzhang
  * @Date: 2018-09-30 09:35:57
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 16:36:14
+ * @Last Modified time: 2018-09-30 17:44:34
  */
 export interface IDefalutFrameData {
     pixels: number[];

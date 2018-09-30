@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 17:39:47
+ * @Last Modified time: 2018-09-30 17:46:25
  */
 
 export type Dictionary = Map<string | number, number>;
@@ -147,7 +147,7 @@ workPool.registerWork('decode', (data) => {
             const start = [0, 4, 2, 1];
             const inc = [8, 8, 4, 2];
             let index = 0;
-            for (let pass = 0; pass < 4; pass += 1) {
+            for (let pass = 0; pass < 4; pass += 1) { // from https://juejin.im/entry/59cc6fa151882550b3549bce
                 for (let i = start[pass]; i < data.h; i += inc[pass]) {
                     for (let j = 0; j < data.w; j += 1) {
                         const idx = (i - 1) * data.w * 4 + j * 4;
