@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:57:06
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 16:43:00
+ * @Last Modified time: 2018-09-30 19:45:47
  */
 import * as CONSTANT from './constants';
 import DecodeFrame from './frame/decode-frame';
@@ -320,10 +320,9 @@ import DecodeFrame from './frame/decode-frame';
         const h = this.readOne() + (this.readOne() << 8);
 
         const frame = new DecodeFrame(w, h, x, y);
-
-        Object.assign(frame, option);
-
+        frame.delegate = this;
         frame.preFrame = this.frames[this.frames.length - 1];
+        Object.assign(frame, option);
 
         const m = this.readOne();
         const isLocalColor = !!(m >> 7 & 1);

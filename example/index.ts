@@ -26,6 +26,7 @@ function test(e) {
                 document.body.appendChild(img);
                 const b = new GIFDecoder();
                 (window as any).b = b;
+                b.readCodes(gIFEncoder.codes).then(() => b.frames.forEach(f =>  document.body.appendChild(f.renderToCanvas().canvas)));
             });
         });
 }

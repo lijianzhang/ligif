@@ -290,7 +290,7 @@
      * @Author: lijianzhang
      * @Date: 2018-09-30 02:53:35
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-09-30 17:43:59
+     * @Last Modified time: 2018-09-30 19:46:38
      */
     class DecodeFrame extends BaseFrame {
         constructor() {
@@ -344,8 +344,8 @@
                 throw new Error('缺少数据');
             const canvas = document.createElement('canvas');
             this.ctx = canvas.getContext('2d');
-            canvas.width = this.width;
-            canvas.height = this.height;
+            canvas.width = this.delegate.width;
+            canvas.height = this.delegate.height;
             let imgData = this.ctx.getImageData(0, 0, this.w, this.h);
             this.pixels.forEach((v, i) => (imgData.data[i] = v));
             this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
@@ -353,8 +353,8 @@
                 this.preFrame) {
                 if (!this.preFrame.ctx)
                     this.preFrame.renderToCanvas(retry);
-                imgData = this.ctx.getImageData(0, 0, this.width, this.height);
-                const prevImageData = this.preFrame.ctx.getImageData(0, 0, this.width, this.height);
+                imgData = this.ctx.getImageData(0, 0, this.delegate.width, this.delegate.height);
+                const prevImageData = this.preFrame.ctx.getImageData(0, 0, this.delegate.width, this.delegate.height);
                 for (let i = 0; i < imgData.data.length; i += 4) {
                     if (imgData.data[i + 3] === 0) {
                         imgData.data[i] = prevImageData.data[i];
@@ -595,8 +595,9 @@
             const w = this.readOne() + (this.readOne() << 8);
             const h = this.readOne() + (this.readOne() << 8);
             const frame = new DecodeFrame(w, h, x, y);
-            Object.assign(frame, option);
+            frame.delegate = this;
             frame.preFrame = this.frames[this.frames.length - 1];
+            Object.assign(frame, option);
             const m = this.readOne();
             const isLocalColor = !!(m >> 7 & 1);
             frame.isInterlace = !!(m >> 6 & 1);
@@ -996,6 +997,7 @@
          * @memberof GifEncoder
          */
         constructor(w, h, options = {}) {
+            this.globalPalette = [];
             /**
              * 编码数据
              *
@@ -1103,10 +1105,9 @@
             this.addCodes(this.strTocode('GIF89a'));
         }
         writeLogicalScreenDescriptor() {
-            const firstImageData = this.frames[0];
             this.addCodes([this.w & 255, this.w >> 8]); // w
             this.addCodes([this.h & 255, this.h >> 8]); // w
-            const globalPalette = firstImageData.palette;
+            const globalPalette = this.globalPalette;
             let m = 1 << 7; // globalColorTableFlag
             m += 0 << 4; // colorResolution
             m += 0 << 3; // sortFlag
@@ -1315,16 +1316,31 @@
             });
         }
         parseFramePalette() {
-            const firstFrame = this.frames[0];
-            const firstPalette = firstFrame.palette;
-            let hasTransparenc = firstFrame.hasTransparenc;
+            const globalFrame = this.frames.reduce((frame, current) => {
+                if (!frame)
+                    return current;
+                if (current.isZip)
+                    return frame;
+                const colorDepth1 = Math.floor(Math.log2(frame.palette.length / 3));
+                const colorDepth2 = Math.floor(Math.log2(current.palette.length / 3));
+                if (colorDepth1 < colorDepth2) {
+                    return current;
+                }
+                else if (colorDepth1 === colorDepth2) {
+                    return frame.palette.length > current.palette.length ? current : frame;
+                }
+                return frame;
+            }, null);
+            const firstPalette = globalFrame.palette;
+            let hasTransparenc = globalFrame.hasTransparenc;
             let transparencIndex;
             if (hasTransparenc) {
                 transparencIndex = firstPalette.length / 3;
                 firstPalette.push(0, 0, 0);
             }
-            const otherFrames = this.frames.slice(1);
-            otherFrames.forEach(frame => {
+            this.frames.forEach(frame => {
+                if (frame === globalFrame)
+                    return;
                 const palette = frame.palette;
                 const firstPaletteCopy = firstPalette.slice();
                 const diffPallette = [];
@@ -1371,10 +1387,11 @@
                     frame.isGlobalPalette = true;
                 }
             });
-            firstFrame.hasTransparenc = hasTransparenc;
-            firstFrame.transparentColorIndex = transparencIndex;
-            firstFrame.isGlobalPalette = true;
-            firstFrame.palette = this.fillPalette(firstPalette);
+            globalFrame.hasTransparenc = hasTransparenc;
+            globalFrame.transparentColorIndex = transparencIndex;
+            globalFrame.isGlobalPalette = true;
+            globalFrame.palette = this.fillPalette(firstPalette);
+            this.globalPalette = globalFrame.palette;
         }
         fillPalette(palette) {
             const colorSize = Math.max(Math.ceil(Math.log2(palette.length / 3)), 2);
@@ -1385,7 +1402,7 @@
         }
         encodeFramePixels() {
             return __awaiter(this, void 0, void 0, function* () {
-                const globalPalette = this.frames[0].palette;
+                const globalPalette = this.globalPalette;
                 return Promise.all(this.frames.map((imgData) => __awaiter(this, void 0, void 0, function* () {
                     const isZip = imgData.isZip;
                     const transparentColorIndex = imgData.transparentColorIndex;
@@ -1468,6 +1485,7 @@
                 document.body.appendChild(img);
                 const b = new GifDecoder();
                 window.b = b;
+                b.readCodes(gIFEncoder.codes).then(() => b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas)));
             });
         });
     }

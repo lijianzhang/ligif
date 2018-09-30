@@ -7,7 +7,7 @@ import * as CONSTANTS from './constants';
  * @Author: lijianzhang
  * @Date: 2018-09-30 09:35:57
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 17:44:34
+ * @Last Modified time: 2018-09-30 19:38:11
  */
 export interface IDefalutFrameData {
     pixels: number[];
@@ -68,6 +68,8 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
      * @memberof GifEncoder
      */
     public h: number;
+
+    public globalPalette: number[] = [];
 
     /**
      * 动画循环次数 0: 永久
@@ -191,12 +193,10 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
     }
 
     private writeLogicalScreenDescriptor() {
-        const firstImageData = this.frames[0];
-
         this.addCodes([this.w & 255, this.w >> 8]);  // w
         this.addCodes([this.h & 255, this.h >> 8]);  // w
 
-        const globalPalette = firstImageData.palette;
+        const globalPalette = this.globalPalette;
         let m = 1 << 7; // globalColorTableFlag
         m += 0 << 4; // colorResolution
         m += 0 << 3; // sortFlag
@@ -330,7 +330,6 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
             let isZip = false;
             let transparencCount = 0;
 
-
             for (let index = 0; index < pixels.length; index += 4) {
 
                 const offset = ((y + Math.floor(index / (w * 4))) * this.w * 4) + ((index % (w * 4)) / 4 + x) * 4;
@@ -434,18 +433,30 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
     }
 
     private parseFramePalette() {
-        const firstFrame = this.frames[0];
-        const firstPalette = firstFrame.palette;
+        const globalFrame = this.frames.reduce((frame, current) => {
+            if (!frame) return current;
+            if (current.isZip) return frame;
+            const colorDepth1 = Math.floor(Math.log2(frame.palette.length / 3));
+            const colorDepth2 = Math.floor(Math.log2(current.palette.length / 3));
+            if (colorDepth1 < colorDepth2) {
+                return current;
+            } else if (colorDepth1 === colorDepth2) {
+                return frame.palette.length > current.palette.length ? current : frame;
+            }
 
-        let hasTransparenc = firstFrame.hasTransparenc;
+            return frame;
+        }, null);
+        const firstPalette = globalFrame.palette;
+
+        let hasTransparenc = globalFrame.hasTransparenc;
         let transparencIndex: number | undefined;
         if (hasTransparenc) {
             transparencIndex = firstPalette.length / 3;
             firstPalette.push(0, 0, 0);
         }
 
-        const otherFrames = this.frames.slice(1);
-        otherFrames.forEach(frame => {
+        this.frames.forEach(frame => {
+            if (frame === globalFrame) return;
             const palette =   frame.palette;
 
             const firstPaletteCopy = firstPalette.slice();
@@ -496,10 +507,11 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
             }
         });
 
-        firstFrame.hasTransparenc = hasTransparenc;
-        firstFrame.transparentColorIndex = transparencIndex;
-        firstFrame.isGlobalPalette = true;
-        firstFrame.palette = this.fillPalette(firstPalette);
+        globalFrame.hasTransparenc = hasTransparenc;
+        globalFrame.transparentColorIndex = transparencIndex;
+        globalFrame.isGlobalPalette = true;
+        globalFrame.palette = this.fillPalette(firstPalette);
+        this.globalPalette = globalFrame.palette;
     }
 
     private fillPalette(palette: number[]) {
@@ -512,7 +524,7 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
     }
 
     private async encodeFramePixels() {
-        const globalPalette = this.frames[0].palette;
+        const globalPalette = this.globalPalette;
 
         return Promise.all(this.frames.map(async (imgData) => {
             const isZip = imgData.isZip;

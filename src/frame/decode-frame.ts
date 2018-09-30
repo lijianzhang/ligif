@@ -2,12 +2,18 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:53:35
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 17:43:59
+ * @Last Modified time: 2018-09-30 19:46:38
  */
 
 import BaseFrame from './base-frame';
 import '../lzw-decode';
 import workPool from '../work-pool';
+
+export interface DecodeFrameDelegate {
+    width: number;
+    height: number;
+}
+
 export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame {
     public preFrame?: DecodeFrame;
 
@@ -16,6 +22,8 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
     public displayType = 0;
 
     public ctx?: CanvasRenderingContext2D;
+
+    public delegate: DecodeFrameDelegate;
 
     /**
      * 第一帧宽度
@@ -64,8 +72,8 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
         if (!this.pixels) throw new Error('缺少数据');
         const canvas = document.createElement('canvas');
         this.ctx = canvas.getContext('2d')!;
-        canvas.width = this.width;
-        canvas.height = this.height;
+        canvas.width = this.delegate.width;
+        canvas.height = this.delegate.height;
 
         let imgData = this.ctx.getImageData(0, 0, this.w, this.h);
         this.pixels!.forEach((v, i) => (imgData.data[i] = v));
@@ -76,12 +84,12 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
             this.preFrame
         ) {
             if (!this.preFrame.ctx) this.preFrame.renderToCanvas(retry);
-            imgData = this.ctx.getImageData(0, 0, this.width, this.height);
+            imgData = this.ctx.getImageData(0, 0, this.delegate.width, this.delegate.height);
             const prevImageData = this.preFrame.ctx!.getImageData(
                 0,
                 0,
-                this.width,
-                this.height
+                this.delegate.width,
+                this.delegate.height
             );
             for (let i = 0; i < imgData.data.length; i += 4) {
                 if (imgData.data[i + 3] === 0) {
