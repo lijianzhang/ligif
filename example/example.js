@@ -162,7 +162,7 @@
      * @Author: lijianzhang
      * @Date: 2018-09-15 19:40:17
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-10-08 11:44:46
+     * @Last Modified time: 2018-10-08 16:52:28
      */
     workPool.registerWork('decode', (data) => {
         class LzwDecode {
@@ -250,7 +250,7 @@
         }
         function decodeToPixels(data) {
             const decode = new LzwDecode(data.colorDepth);
-            const codes = decode.decode(Uint8Array.from(data.imgData));
+            const codes = decode.decode(data.imgData);
             const pixels = [];
             if (!data.isInterlace) {
                 codes.forEach((k) => {
@@ -287,7 +287,7 @@
      * @Author: lijianzhang
      * @Date: 2018-09-30 02:53:35
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-10-08 10:44:15
+     * @Last Modified time: 2018-10-08 17:04:28
      */
     class DecodeFrame extends BaseFrame {
         constructor() {
@@ -297,14 +297,13 @@
         }
         decodeToPixels() {
             return __awaiter(this, void 0, void 0, function* () {
-                const array = Uint8Array.from(this.imgData);
-                const pixels = yield workPool.executeWork('decode', [{ imgData: array,
+                const pixels = yield workPool.executeWork('decode', [{ imgData: this.imgData,
                         colorDepth: this.colorDepth,
                         palette: this.palette,
                         h: this.h,
                         w: this.w,
                         transparentColorIndex: this.transparentColorIndex,
-                        isInterlace: this.isInterlace }], [array.buffer]);
+                        isInterlace: this.isInterlace }]);
                 this.pixels = pixels;
             });
         }
@@ -338,7 +337,6 @@
                         imgData.data[i + 3] = 255;
                     }
                 }
-                this.ctx.putImageData(imgData, 0, 0);
             }
             else if ((this.displayType === 1 || this.displayType === 2) &&
                 this.preFrame) {

@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:53:35
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-10-08 10:44:15
+ * @Last Modified time: 2018-10-08 17:04:28
  */
 
 import BaseFrame from './base-frame';
@@ -27,14 +27,13 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
     public delegate: DecodeFrameDelegate;
 
     public async decodeToPixels() {
-        const array = Uint8Array.from(this.imgData);
-        const pixels = await workPool.executeWork('decode', [{ imgData: array,
+        const pixels = await workPool.executeWork('decode', [{ imgData: this.imgData,
             colorDepth: this.colorDepth,
             palette: this.palette,
             h: this.h,
             w: this.w,
             transparentColorIndex: this.transparentColorIndex,
-            isInterlace: this.isInterlace }], [array.buffer]);
+            isInterlace: this.isInterlace }]);
         this.pixels = pixels;
     }
 
@@ -69,7 +68,6 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
                     imgData.data[i + 3] = 255;
                 }
             }
-            this.ctx.putImageData(imgData, 0, 0);
         } else if (
             (this.displayType === 1 || this.displayType === 2) &&
             this.preFrame

@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-10-08 11:44:46
+ * @Last Modified time: 2018-10-08 16:52:28
  */
 
 export type Dictionary = Map<string | number, number>;
@@ -27,7 +27,7 @@ workPool.registerWork('decode', (data) => {
 
         private endCode!: number;
 
-        private buffers!: Uint8Array | number[];
+        private buffers!: number[];
 
         private index = 0;
 
@@ -35,7 +35,7 @@ workPool.registerWork('decode', (data) => {
 
         private codes: number[] = [];
 
-        public decode(buffers: Uint8Array) {
+        public decode(buffers: number[]) {
             this.buffers = buffers;
             const outputs: number[] = [];
             let code: number = this.clearCode;
@@ -131,7 +131,7 @@ workPool.registerWork('decode', (data) => {
             isInterlace?: boolean;
         }) {
         const decode = new LzwDecode(data.colorDepth);
-        const codes = decode.decode(Uint8Array.from(data.imgData));
+        const codes = decode.decode(data.imgData);
         const pixels = [];
         if (!data.isInterlace) {
             codes.forEach((k) => {

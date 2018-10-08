@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:57:06
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-10-08 10:42:14
+ * @Last Modified time: 2018-10-08 16:51:14
  */
 import * as CONSTANT from './constants';
 import DecodeFrame from './frame/decode-frame';
