@@ -19,6 +19,7 @@ function test(e) {
     gif.readData(field).then(gif => {
        gif.frames.forEach(f =>  document.body.appendChild(f.renderToCanvas().canvas));
             const gIFEncoder = new GIFEncoder(gif.width, gif.height);
+            (window as any).gIFEncoder = gIFEncoder;
             gIFEncoder.addFrames(gif.frames.map(f => ({ img: f.ctx!.canvas, delay: f.delay })));
             gIFEncoder.encode().then(() => {
                 const img = document.createElement('img');

@@ -7,7 +7,7 @@ import * as CONSTANTS from './constants';
  * @Author: lijianzhang
  * @Date: 2018-09-30 09:35:57
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 19:38:11
+ * @Last Modified time: 2018-10-08 11:39:42
  */
 export interface IDefalutFrameData {
     pixels: number[];
@@ -224,7 +224,7 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
     }
 
     private writeGraphicsControlExtension() {
-        const globalPalette = this.frames[0].palette;
+        const globalPalette = this.globalPalette;
         this.frames.filter(data => data.w && data.h).forEach((frame) => {
             // 1. Graphics Control Extension
             this.addCode(CONSTANTS.extension); // exc flag
@@ -296,7 +296,10 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
         };
     }
 
-    // from: https://blog.csdn.net/jaych/article/details/51137341?utm_source=copy
+    /**
+     * 计算色差
+     * from: https://blog.csdn.net/jaych/article/details/51137341?utm_source=cop
+     */
     private colourDistance(rgb1: [number, number, number], rgb2: [number, number, number]) {
       const rmean = (rgb1[0] + rgb2[0]) / 2;
       const r = rgb1[0] - rgb2[0];
@@ -421,6 +424,7 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
                 nq.buildColorMap();
                 palette = [...nq.getColorMap()];
             }
+
             frame.x = x;
             frame.y = y;
             frame.w = w;

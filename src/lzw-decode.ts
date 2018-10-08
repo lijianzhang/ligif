@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-15 19:40:17
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 17:46:25
+ * @Last Modified time: 2018-10-08 11:44:46
  */
 
 export type Dictionary = Map<string | number, number>;
@@ -102,11 +102,8 @@ workPool.registerWork('decode', (data) => {
             let code = 0;
             let diff = 0;
 
-            while (colorSize > 0) {
+            while (colorSize > 0 && this.buffers[this.index] !== undefined) {
                 const buffer = this.buffers[this.index];
-                if (buffer === undefined) {
-                    throw new Error('图片缺失数据');
-                }
                 const size = Math.min(colorSize, this.remainingBits);
                 code = ((buffer >> (8 - this.remainingBits) & (1 << size) - 1) << (diff)) | code;
                 colorSize -= this.remainingBits;

@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:53:35
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 19:46:38
+ * @Last Modified time: 2018-10-08 10:44:15
  */
 
 import BaseFrame from './base-frame';
@@ -12,6 +12,7 @@ import workPool from '../work-pool';
 export interface DecodeFrameDelegate {
     width: number;
     height: number;
+    backgroundColor: [number, number, number] | null;
 }
 
 export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame {
@@ -24,28 +25,6 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
     public ctx?: CanvasRenderingContext2D;
 
     public delegate: DecodeFrameDelegate;
-
-    /**
-     * 第一帧宽度
-     */
-    get width() {
-        if (this.preFrame) {
-            return this.preFrame.width;
-        }
-
-        return this.w + this.x;
-    }
-
-    /**
-     * 第一帧高度
-     */
-    get height() {
-        if (this.preFrame) {
-            return this.preFrame.height;
-        }
-
-        return this.h + this.y;
-    }
 
     public async decodeToPixels() {
         const array = Uint8Array.from(this.imgData);
@@ -76,10 +55,22 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
         canvas.height = this.delegate.height;
 
         let imgData = this.ctx.getImageData(0, 0, this.w, this.h);
+
         this.pixels!.forEach((v, i) => (imgData.data[i] = v));
         this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
 
-        if (
+        if (!this.preFrame && this.delegate.backgroundColor) {
+            imgData = this.ctx.getImageData(0, 0, this.delegate.width, this.delegate.height);
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                if (imgData.data[i + 3] === 0) {
+                    imgData.data[i] = this.delegate.backgroundColor[0];
+                    imgData.data[i + 1] = this.delegate.backgroundColor[1];
+                    imgData.data[i + 2] = this.delegate.backgroundColor[2];
+                    imgData.data[i + 3] = 255;
+                }
+            }
+            this.ctx.putImageData(imgData, 0, 0);
+        } else if (
             (this.displayType === 1 || this.displayType === 2) &&
             this.preFrame
         ) {

@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:57:06
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 19:45:47
+ * @Last Modified time: 2018-10-08 10:42:14
  */
 import * as CONSTANT from './constants';
 import DecodeFrame from './frame/decode-frame';
@@ -89,6 +89,16 @@ import DecodeFrame from './frame/decode-frame';
     private offset = 0;
 
     private frameOptions?: Partial<LiGif.IDecodeFrame>;
+
+    get backgroundColor(): [number, number, number] | null {
+        if (!('backgroundColorIndex' in this) || !this.globalPalette) return null;
+
+        return [
+            this.globalPalette[this.backgroundColorIndex],
+            this.globalPalette[this.backgroundColorIndex + 1],
+            this.globalPalette[this.backgroundColorIndex + 2]
+        ];
+    }
 
     public async readData(data: Blob) {
         const fieldReader = new FileReader();

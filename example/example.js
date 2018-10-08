@@ -162,7 +162,7 @@
      * @Author: lijianzhang
      * @Date: 2018-09-15 19:40:17
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-09-30 17:46:25
+     * @Last Modified time: 2018-10-08 11:44:46
      */
     workPool.registerWork('decode', (data) => {
         class LzwDecode {
@@ -232,11 +232,8 @@
                 let colorSize = this.colorSize;
                 let code = 0;
                 let diff = 0;
-                while (colorSize > 0) {
+                while (colorSize > 0 && this.buffers[this.index] !== undefined) {
                     const buffer = this.buffers[this.index];
-                    if (buffer === undefined) {
-                        throw new Error('图片缺失数据');
-                    }
                     const size = Math.min(colorSize, this.remainingBits);
                     code = ((buffer >> (8 - this.remainingBits) & (1 << size) - 1) << (diff)) | code;
                     colorSize -= this.remainingBits;
@@ -290,31 +287,13 @@
      * @Author: lijianzhang
      * @Date: 2018-09-30 02:53:35
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-09-30 19:46:38
+     * @Last Modified time: 2018-10-08 10:44:15
      */
     class DecodeFrame extends BaseFrame {
         constructor() {
             super(...arguments);
             this.imgData = [];
             this.displayType = 0;
-        }
-        /**
-         * 第一帧宽度
-         */
-        get width() {
-            if (this.preFrame) {
-                return this.preFrame.width;
-            }
-            return this.w + this.x;
-        }
-        /**
-         * 第一帧高度
-         */
-        get height() {
-            if (this.preFrame) {
-                return this.preFrame.height;
-            }
-            return this.h + this.y;
         }
         decodeToPixels() {
             return __awaiter(this, void 0, void 0, function* () {
@@ -349,7 +328,19 @@
             let imgData = this.ctx.getImageData(0, 0, this.w, this.h);
             this.pixels.forEach((v, i) => (imgData.data[i] = v));
             this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
-            if ((this.displayType === 1 || this.displayType === 2) &&
+            if (!this.preFrame && this.delegate.backgroundColor) {
+                imgData = this.ctx.getImageData(0, 0, this.delegate.width, this.delegate.height);
+                for (let i = 0; i < imgData.data.length; i += 4) {
+                    if (imgData.data[i + 3] === 0) {
+                        imgData.data[i] = this.delegate.backgroundColor[0];
+                        imgData.data[i + 1] = this.delegate.backgroundColor[1];
+                        imgData.data[i + 2] = this.delegate.backgroundColor[2];
+                        imgData.data[i + 3] = 255;
+                    }
+                }
+                this.ctx.putImageData(imgData, 0, 0);
+            }
+            else if ((this.displayType === 1 || this.displayType === 2) &&
                 this.preFrame) {
                 if (!this.preFrame.ctx)
                     this.preFrame.renderToCanvas(retry);
@@ -392,6 +383,15 @@
              * @memberof GifDecoder
              */
             this.offset = 0;
+        }
+        get backgroundColor() {
+            if (!('backgroundColorIndex' in this) || !this.globalPalette)
+                return null;
+            return [
+                this.globalPalette[this.backgroundColorIndex],
+                this.globalPalette[this.backgroundColorIndex + 1],
+                this.globalPalette[this.backgroundColorIndex + 2]
+            ];
         }
         readData(data) {
             return __awaiter(this, void 0, void 0, function* () {
@@ -757,7 +757,7 @@
     const prime3 = 487;
     const prime4 = 503;
     const maxprime = Math.max(prime1, prime2, prime3, prime4);
-    const minpicturebytes = (3 * maxprime);
+    const minpicturebytes = (maxprime * 3);
     const defaults = {
         ncycles: 100,
         netsize: 256,
@@ -799,15 +799,15 @@
             this.bias = new Uint32Array(this.netsize);
             this.freq = new Uint32Array(this.netsize);
             this.radpower = new Uint32Array(this.netsize >> 3);
-            for (let i = 0, l = this.netsize; i < l; i++) {
-                let v = (i << (this.netbiasshift + 8)) / this.netsize;
+            for (let i = 0, l = this.netsize; i < l; i++) { //tslint:disable-line
+                const v = (i << (this.netbiasshift + 8)) / this.netsize;
                 this.network[i] = new Float64Array([v, v, v, 0]);
                 this.freq[i] = this.intbias / this.netsize;
                 this.bias[i] = 0;
             }
         }
         unbiasnet() {
-            for (let i = 0, l = this.netsize; i < l; i++) {
+            for (let i = 0, l = this.netsize; i < l; i += 1) { //tslint:disable-line
                 this.network[i][0] >>= this.netbiasshift;
                 this.network[i][1] >>= this.netbiasshift;
                 this.network[i][2] >>= this.netbiasshift;
@@ -826,15 +826,15 @@
             let k = i - 1;
             let m = 1;
             while ((j < hi) || (k > lo)) {
-                const a = this.radpower[m++];
+                const a = this.radpower[m += 1];
                 if (j < hi) {
-                    const p = this.network[j++];
+                    const p = this.network[j += 1];
                     p[0] -= (a * (p[0] - b)) / this.alpharadbias;
                     p[1] -= (a * (p[1] - g)) / this.alpharadbias;
                     p[2] -= (a * (p[2] - r)) / this.alpharadbias;
                 }
                 if (k > lo) {
-                    const p = this.network[k--];
+                    const p = this.network[k -= 1];
                     p[0] -= (a * (p[0] - b)) / this.alpharadbias;
                     p[1] -= (a * (p[1] - g)) / this.alpharadbias;
                     p[2] -= (a * (p[2] - r)) / this.alpharadbias;
@@ -846,19 +846,19 @@
             let bestbiasd = bestd;
             let bestpos = -1;
             let bestbiaspos = bestpos;
-            for (let i = 0, l = this.netsize; i < l; i++) {
-                let n = this.network[i];
-                let dist = Math.abs(n[0] - b) + Math.abs(n[1] - g) + Math.abs(n[2] - r);
+            for (let i = 0, l = this.netsize; i < l; i++) { //tslint:disable-line
+                const n = this.network[i];
+                const dist = Math.abs(n[0] - b) + Math.abs(n[1] - g) + Math.abs(n[2] - r);
                 if (dist < bestd) {
                     bestd = dist;
                     bestpos = i;
                 }
-                let biasdist = dist - ((this.bias[i]) >> (this.intbiasshift - this.netbiasshift));
+                const biasdist = dist - ((this.bias[i]) >> (this.intbiasshift - this.netbiasshift));
                 if (biasdist < bestbiasd) {
                     bestbiasd = biasdist;
                     bestbiaspos = i;
                 }
-                let betafreq = (this.freq[i] >> this.betashift);
+                const betafreq = (this.freq[i] >> this.betashift);
                 this.freq[i] -= betafreq;
                 this.bias[i] += (betafreq << this.gammashift);
             }
@@ -869,12 +869,12 @@
         inxbuild() {
             let previouscol = 0;
             let startpos = 0;
-            for (let i = 0, l = this.netsize; i < l; i++) {
-                let p = this.network[i];
+            for (let i = 0, l = this.netsize; i < l; i++) { //tslint:disable-line
+                const p = this.network[i];
                 let q = null;
                 let smallpos = i;
                 let smallval = p[1];
-                for (let j = i + 1; j < l; j++) {
+                for (let j = i + 1; j < l; j += 1) {
                     q = this.network[j];
                     if (q[1] < smallval) {
                         smallpos = j;
@@ -890,7 +890,7 @@
                 }
                 if (smallval !== previouscol) {
                     this.netindex[previouscol] = (startpos + i) >> 1;
-                    for (let j = previouscol + 1; j < smallval; j++) {
+                    for (let j = previouscol + 1; j < smallval; j += 1) {
                         this.netindex[j] = i;
                     }
                     previouscol = smallval;
@@ -898,14 +898,14 @@
                 }
             }
             this.netindex[previouscol] = (startpos + this.maxnetpos) >> 1;
-            for (let i = previouscol + 1; i < 256; i++) {
+            for (let i = previouscol + 1; i < 256; i += 1) {
                 this.netindex[i] = this.maxnetpos;
             }
         }
         learn() {
             const lengthcount = this.pixels.length;
-            const alphadec = 30 + ((this.samplefac - 1) / 3);
-            const samplepixels = lengthcount / (3 * this.samplefac);
+            const alphadec = ((this.samplefac - 1) / 3) + 30;
+            const samplepixels = lengthcount / (this.samplefac * 3);
             let delta = samplepixels / this.ncycles | 0;
             let alpha = this.initalpha;
             let radius = this.initradius;
@@ -913,7 +913,7 @@
             if (rad <= 1) {
                 rad = 0;
             }
-            for (let i = 0; i < rad; i++) {
+            for (let i = 0; i < rad; i += 1) {
                 this.radpower[i] = alpha * (((rad * rad - i * i) * this.radbias) / (rad * rad));
             }
             let step;
@@ -922,23 +922,23 @@
                 step = 3;
             }
             else if ((lengthcount % prime1) !== 0) {
-                step = 3 * prime1;
+                step = prime1 * 3;
             }
             else if ((lengthcount % prime2) !== 0) {
-                step = 3 * prime2;
+                step = prime2 * 3;
             }
             else if ((lengthcount % prime3) !== 0) {
-                step = 3 * prime3;
+                step = prime3 * 3;
             }
             else {
-                step = 3 * prime4;
+                step = prime4 * 3;
             }
             let pix = 0;
             for (let i = 0; i < samplepixels;) {
-                let b = (this.pixels[pix] & 0xff) << this.netbiasshift;
-                let g = (this.pixels[pix + 1] & 0xff) << this.netbiasshift;
-                let r = (this.pixels[pix + 2] & 0xff) << this.netbiasshift;
-                let j = this.contest(b, g, r);
+                const b = (this.pixels[pix] & 0xff) << this.netbiasshift; //tslint:disable-line
+                const g = (this.pixels[pix + 1] & 0xff) << this.netbiasshift; //tslint:disable-line
+                const r = (this.pixels[pix + 2] & 0xff) << this.netbiasshift; //tslint:disable-line
+                const j = this.contest(b, g, r);
                 this.altersingle(alpha, j, b, g, r);
                 if (rad !== 0) {
                     this.alterneigh(rad, j, b, g, r);
@@ -950,14 +950,14 @@
                 if (delta === 0) {
                     delta = 1;
                 }
-                if (++i % delta === 0) {
+                if (++i % delta === 0) { //tslint:disable-line
                     alpha -= alpha / alphadec;
                     radius -= radius / this.radiusdec;
                     rad = radius >> this.radiusbiasshift;
                     if (rad <= 1) {
                         rad = 0;
                     }
-                    for (let k = 0; k < rad; k++) {
+                    for (let k = 0; k < rad; k += 1) {
                         this.radpower[k] = alpha * (((rad * rad - k * k) * this.radbias) / (rad * rad));
                     }
                 }
@@ -971,14 +971,14 @@
         getColorMap() {
             const map = new Uint8Array(this.netsize * 3);
             const index = new Uint8Array(this.netsize);
-            for (let i = 0, l = this.netsize; i < l; i++) {
+            for (let i = 0, l = this.netsize; i < l; i++) { //tslint:disable-line
                 index[this.network[i][3]] = i;
             }
-            for (let i = 0, j = 0, k = 0, l = this.netsize; i < l; i++) {
+            for (let i = 0, j = 0, k = 0, l = this.netsize; i < l; i++) { //tslint:disable-line
                 k = index[i];
-                map[j++] = this.network[k][0] & 0xff;
-                map[j++] = this.network[k][1] & 0xff;
-                map[j++] = this.network[k][2] & 0xff;
+                map[j++] = this.network[k][0] & 0xff; //tslint:disable-line
+                map[j++] = this.network[k][1] & 0xff; //tslint:disable-line
+                map[j++] = this.network[k][2] & 0xff; //tslint:disable-line
             }
             return map;
         }
@@ -1132,7 +1132,7 @@
             }
         }
         writeGraphicsControlExtension() {
-            const globalPalette = this.frames[0].palette;
+            const globalPalette = this.globalPalette;
             this.frames.filter(data => data.w && data.h).forEach((frame) => {
                 // 1. Graphics Control Extension
                 this.addCode(extension); // exc flag
@@ -1194,7 +1194,10 @@
                 pixels: [...ctx.getImageData(0, 0, this.w, this.h).data]
             };
         }
-        // from: https://blog.csdn.net/jaych/article/details/51137341?utm_source=copy
+        /**
+         * 计算色差
+         * from: https://blog.csdn.net/jaych/article/details/51137341?utm_source=cop
+         */
         colourDistance(rgb1, rgb2) {
             const rmean = (rgb1[0] + rgb2[0]) / 2;
             const r = rgb1[0] - rgb2[0];
@@ -1478,6 +1481,7 @@
         gif.readData(field).then(gif => {
             gif.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
             const gIFEncoder = new GifEncoder(gif.width, gif.height);
+            window.gIFEncoder = gIFEncoder;
             gIFEncoder.addFrames(gif.frames.map(f => ({ img: f.ctx.canvas, delay: f.delay })));
             gIFEncoder.encode().then(() => {
                 const img = document.createElement('img');
