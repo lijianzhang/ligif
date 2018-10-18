@@ -12,7 +12,7 @@ class WorkPool {
     public pools: { work: Worker; isUse: boolean; name: string }[] = [];
 
     public queue: {name: string; args: any[]; res: Function; rej: Function; transferable?: any[]}[] = [];
-    private maxNum = navigator.hardwareConcurrency;
+    private maxNum = navigator.hardwareConcurrency || 2;
 
     public registerWork(name: string, fn: Function | Blob) {
         let blob: Blob;

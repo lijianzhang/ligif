@@ -8,7 +8,7 @@ import * as CONSTANTS from './constants';
  * @Author: lijianzhang
  * @Date: 2018-09-30 09:35:57
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-10-08 14:15:56
+ * @Last Modified time: 2018-12-04 01:14:14
  */
 export interface IDefalutFrameData {
     pixels: number[];
@@ -305,6 +305,7 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
             const { paletteMap, transparencCount, x, y, w, h, newPixels } = datas[index];
             let palette = datas[index].palette;
             if (paletteMap.size > 256) {
+                console.log('NeuQuant');
                 const nq = new NeuQuant(palette, {
                     netsize: transparencCount > 0 ? 255 : 256,
                     samplefac: 1

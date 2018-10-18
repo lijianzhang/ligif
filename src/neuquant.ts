@@ -1,4 +1,5 @@
 /**
+ *
  * NeuQuant Neural-Network Quantization Algorithm
  *
  * Copyright (c) 1994 Anthony Dekker
@@ -23,6 +24,7 @@
  */
 
 // from: https://github.com/unindented/neuquant-js/blob/master/src/neuquant.js;
+// tslint:disable
 
 const prime1 = 499;
 const prime2 = 491;
@@ -30,7 +32,7 @@ const prime3 = 487;
 const prime4 = 503;
 
 const maxprime = Math.max(prime1, prime2, prime3, prime4);
-const minpicturebytes = (maxprime * 3);
+const minpicturebytes = (3 * maxprime);
 
 const defaults = {
     ncycles: 100,
@@ -84,7 +86,7 @@ export default class NeuQuant {
         this.freq = new Uint32Array(this.netsize);
         this.radpower = new Uint32Array(this.netsize >> 3);
 
-        for (let i = 0, l = this.netsize; i < l; i++) {//tslint:disable-line
+        for (let i = 0, l = this.netsize; i < l; i++) {
             const v = (i << (this.netbiasshift + 8)) / this.netsize;
             this.network[i] = new Float64Array([v, v, v, 0]);
             this.freq[i] = this.intbias / this.netsize;
@@ -95,7 +97,7 @@ export default class NeuQuant {
     [k: string]: any;
 
     public unbiasnet() {
-        for (let i = 0, l = this.netsize; i < l; i += 1) { //tslint:disable-line
+        for (let i = 0, l = this.netsize; i < l; i++) {
             this.network[i][0] >>= this.netbiasshift;
             this.network[i][1] >>= this.netbiasshift;
             this.network[i][2] >>= this.netbiasshift;
@@ -118,17 +120,17 @@ export default class NeuQuant {
         let m = 1;
 
         while ((j < hi) || (k > lo)) {
-            const a = this.radpower[m += 1];
+            const a = this.radpower[m++];
 
             if (j < hi) {
-                const p = this.network[j += 1];
+                const p = this.network[j++];
                 p[0] -= (a * (p[0] - b)) / this.alpharadbias;
                 p[1] -= (a * (p[1] - g)) / this.alpharadbias;
                 p[2] -= (a * (p[2] - r)) / this.alpharadbias;
             }
 
             if (k > lo) {
-                const p = this.network[k -= 1];
+                const p = this.network[k--];
                 p[0] -= (a * (p[0] - b)) / this.alpharadbias;
                 p[1] -= (a * (p[1] - g)) / this.alpharadbias;
                 p[2] -= (a * (p[2] - r)) / this.alpharadbias;
@@ -142,7 +144,7 @@ export default class NeuQuant {
         let bestpos = -1;
         let bestbiaspos = bestpos;
 
-        for (let i = 0, l = this.netsize; i < l; i++) {//tslint:disable-line
+        for (let i = 0, l = this.netsize; i < l; i++) {
             const n = this.network[i];
 
             const dist = Math.abs(n[0] - b) + Math.abs(n[1] - g) + Math.abs(n[2] - r);
@@ -172,13 +174,13 @@ export default class NeuQuant {
         let previouscol = 0;
         let startpos = 0;
 
-        for (let i = 0, l = this.netsize; i < l; i++) {//tslint:disable-line
+        for (let i = 0, l = this.netsize; i < l; i++) {
             const p = this.network[i];
             let q = null;
             let smallpos = i;
             let smallval = p[1];
 
-            for (let j = i + 1; j < l; j += 1) {
+            for (let j = i + 1; j < l; j++) {
                 q = this.network[j];
                 if (q[1] < smallval) {
                     smallpos = j;
@@ -196,7 +198,7 @@ export default class NeuQuant {
 
             if (smallval !== previouscol) {
                 this.netindex[previouscol] = (startpos + i) >> 1;
-                for (let j = previouscol + 1; j < smallval; j += 1) {
+                for (let j = previouscol + 1; j < smallval; j++) {
                     this.netindex[j] = i;
                 }
                 previouscol = smallval;
@@ -205,14 +207,14 @@ export default class NeuQuant {
         }
 
         this.netindex[previouscol] = (startpos + this.maxnetpos) >> 1;
-        for (let i = previouscol + 1; i < 256; i += 1) {
+        for (let i = previouscol + 1; i < 256; i++) {
             this.netindex[i] = this.maxnetpos;
         }
     }
     public learn() {
         const lengthcount = this.pixels.length;
-        const alphadec = ((this.samplefac - 1) / 3) + 30;
-        const samplepixels = lengthcount / (this.samplefac * 3);
+        const alphadec = 30 + ((this.samplefac - 1) / 3);
+        const samplepixels = lengthcount / (3 * this.samplefac);
 
         let delta = samplepixels / this.ncycles | 0;
         let alpha = this.initalpha;
@@ -224,7 +226,7 @@ export default class NeuQuant {
             rad = 0;
         }
 
-        for (let i = 0; i < rad; i += 1) {
+        for (let i = 0; i < rad; i++) {
             this.radpower[i] = alpha * (((rad * rad - i * i) * this.radbias) / (rad * rad));
         }
 
@@ -233,21 +235,21 @@ export default class NeuQuant {
             this.samplefac = 1;
             step = 3;
         } else if ((lengthcount % prime1) !== 0) {
-            step = prime1 * 3;
+            step = 3 * prime1;
         } else if ((lengthcount % prime2) !== 0) {
-            step = prime2 * 3;
+            step = 3 * prime2;
         } else if ((lengthcount % prime3) !== 0) {
-            step = prime3 * 3;
+            step = 3 * prime3;
         } else {
-            step = prime4 * 3;
+            step = 3 * prime4;
         }
 
         let pix = 0;
 
         for (let i = 0; i < samplepixels;) {
-            const b = (this.pixels[pix] & 0xff) << this.netbiasshift; //tslint:disable-line
-            const g = (this.pixels[pix + 1] & 0xff) << this.netbiasshift; //tslint:disable-line
-            const r = (this.pixels[pix + 2] & 0xff) << this.netbiasshift; //tslint:disable-line
+            const b = (this.pixels[pix] & 0xff) << this.netbiasshift;
+            const g = (this.pixels[pix + 1] & 0xff) << this.netbiasshift;
+            const r = (this.pixels[pix + 2] & 0xff) << this.netbiasshift;
 
             const j = this.contest(b, g, r);
             this.altersingle(alpha, j, b, g, r);
@@ -264,7 +266,7 @@ export default class NeuQuant {
                 delta = 1;
             }
 
-            if (++i % delta === 0) { //tslint:disable-line
+            if (++i % delta === 0) {
                 alpha -= alpha / alphadec;
                 radius -= radius / this.radiusdec;
                 rad = radius >> this.radiusbiasshift;
@@ -273,7 +275,7 @@ export default class NeuQuant {
                     rad = 0;
                 }
 
-                for (let k = 0; k < rad; k += 1) {
+                for (let k = 0; k < rad; k++) {
                     this.radpower[k] = alpha * (((rad * rad - k * k) * this.radbias) / (rad * rad));
                 }
             }
@@ -290,15 +292,15 @@ export default class NeuQuant {
         const map = new Uint8Array(this.netsize * 3);
         const index = new Uint8Array(this.netsize);
 
-        for (let i = 0, l = this.netsize; i < l; i++) {//tslint:disable-line
+        for (let i = 0, l = this.netsize; i < l; i++) {
             index[this.network[i][3]] = i;
         }
 
-        for (let i = 0, j = 0, k = 0, l = this.netsize; i < l; i++) {//tslint:disable-line
+        for (let i = 0, j = 0, k = 0, l = this.netsize; i < l; i++) {
             k = index[i];
-            map[j++] = this.network[k][0] & 0xff;//tslint:disable-line
-            map[j++] = this.network[k][1] & 0xff;//tslint:disable-line
-            map[j++] = this.network[k][2] & 0xff;//tslint:disable-line
+            map[j++] = this.network[k][0] & 0xff;
+            map[j++] = this.network[k][1] & 0xff;
+            map[j++] = this.network[k][2] & 0xff;
         }
 
         return map;

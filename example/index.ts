@@ -49,16 +49,12 @@ encoder.encode().then(() => {
 
 
 
-// const field = document.getElementById('file') as HTMLInputElement;
-// field.onchange = () => {
-//     const a = new GIFEncoder(320, 180);
-//     a.encodeByVideo({ src: field.files[0], from: 1, to: 3, fps: 5 }).then(() => {
-//         const img = document.createElement('img');
-//         img.src = URL.createObjectURL(a.toBlob());
-//         document.body.appendChild(img);
-//         const b = new GIFDecoder();
-//         b.readCodes(a.codes).then(() => {
-//             b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
-//         });
-//     });
-// };
+const field = document.getElementById('file') as HTMLInputElement;
+field.onchange = () => {
+    const a = new GIFEncoder(320, 180);
+    a.encodeByVideo({ src: field.files[0], from: 3, to: 6, fps: 5 }).then(() => {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(a.toBlob());
+        document.body.appendChild(img);
+    });
+};
