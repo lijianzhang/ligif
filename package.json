@@ -22,13 +22,13 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@gaoding/eslint-config-typescript": "^1.1.1",
+    "eslint": "^5.16.0",
     "rollup": "^0.66.2",
     "rollup-plugin-commonjs": "^9.0.0",
     "rollup-plugin-serve": "^0.6.0",
     "rollup-plugin-typescript2": "^0.17.0",
     "rollup-plugin-uglify": "^3.0.0",
-    "tslint": "^5.11.0",
-    "tslint-microsoft-contrib": "^5.2.1",
     "typescript": "^3.1.1"
   }
 }

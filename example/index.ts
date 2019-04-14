@@ -3,12 +3,6 @@ import { GIFDecoder, GIFEncoder } from '../src';
 (window as any).GIFEncoder = GIFEncoder;
 (window as any).GIFDecoder = GIFDecoder;
 
-document.getElementById('main').addEventListener('drop', test);
-document.getElementById('main').addEventListener('dragover', (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-});
-
 function test(e) {
     e.stopPropagation();
     e.preventDefault();
@@ -16,20 +10,31 @@ function test(e) {
     const field = e.dataTransfer.files[0];
     const gif = new GIFDecoder();
     (window as any).gif = gif;
+    console.time('decode time');
     gif.readData(field).then(gif => {
-       gif.frames.forEach(f =>  document.body.appendChild(f.renderToCanvas().canvas));
-            const gIFEncoder = new GIFEncoder(gif.width, gif.height);
-            (window as any).gIFEncoder = gIFEncoder;
-            gIFEncoder.addFrames(gif.frames.map(f => ({ img: f.ctx!.canvas, delay: f.delay })));
-            gIFEncoder.encode().then(() => {
-                const img = document.createElement('img');
-                img.src = URL.createObjectURL(gIFEncoder.toBlob());
-                document.body.appendChild(img);
-                const b = new GIFDecoder();
-                (window as any).b = b;
-                b.readCodes(gIFEncoder.codes).then(() => b.frames.forEach(f =>  document.body.appendChild(f.renderToCanvas().canvas)));
-            });
+        console.timeEnd('decode time');
+        gif.frames.forEach(f =>
+            document
+                .querySelector('#imgs')
+                .appendChild(f.renderToCanvas().canvas),
+        );
+        const width = Math.min(400, gif.width);
+        const zoom = gif.width / width;
+        const gIFEncoder = new GIFEncoder(width, gif.height / zoom);
+        (window as any).gIFEncoder = gIFEncoder;
+        gIFEncoder.addFrames(
+            gif.frames.map(f => ({ img: f.ctx!.canvas, delay: f.delay })),
+        );
+        console.time('encode time');
+        gIFEncoder.encode().then(() => {
+            console.timeEnd('encode time');
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(gIFEncoder.toBlob());
+            document
+                .querySelector('#imgs')
+                .insertBefore(img, document.querySelector('canvas'));
         });
+    });
 }
 
 const img1 = document.getElementById('img1') as HTMLImageElement;
@@ -47,14 +52,20 @@ encoder.encode().then(() => {
     document.body.appendChild(img);
 });
 
-
-
 const field = document.getElementById('file') as HTMLInputElement;
 field.onchange = () => {
     const a = new GIFEncoder(320, 180);
-    a.encodeByVideo({ src: field.files[0], from: 3, to: 6, fps: 5 }).then(() => {
-        const img = document.createElement('img');
-        img.src = URL.createObjectURL(a.toBlob());
-        document.body.appendChild(img);
-    });
+    a.encodeByVideo({ src: field.files[0], from: 3, to: 6, fps: 5 }).then(
+        () => {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(a.toBlob());
+            document.body.appendChild(img);
+        },
+    );
 };
+
+document.getElementById('main').addEventListener('drop', test);
+document.getElementById('main').addEventListener('dragover', e => {
+    e.stopPropagation();
+    e.preventDefault();
+});

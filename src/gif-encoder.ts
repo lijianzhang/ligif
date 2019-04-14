@@ -8,7 +8,7 @@ import * as CONSTANTS from './constants';
  * @Author: lijianzhang
  * @Date: 2018-09-30 09:35:57
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-12-04 01:14:14
+ * @Last Modified time: 2019-04-14 21:06:25
  */
 export interface IDefalutFrameData {
     pixels: number[];
@@ -33,13 +33,13 @@ export interface IPixelsFrameData {
 }
 
 const defaultOptions = {
-    time: 0
+    time: 0,
+    colorDiff: 30,
 };
-
 
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 
- export default class GifEncoder {
+export default class GifEncoder {
     /**
      *
      * @param {number} w
@@ -47,12 +47,19 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
      * @param {number} [time=0] //如果0表示将一直循环
      * @memberof GifEncoder
      */
-    constructor(w: number, h: number, options: { time?: number } = {}) {
-        const o = {...defaultOptions, ...options};
+    constructor(
+        w: number,
+        h: number,
+        options: { time?: number; colorDiff?: number } = {},
+    ) {
+        const o = { ...defaultOptions, ...options };
         this.w = w;
         this.h = h;
         this.time = o.time;
+        this.colorDiff = o.colorDiff;
     }
+
+    colorDiff: number;
 
     /**
      * gif宽度
@@ -104,7 +111,7 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
         this.frames.push(f);
     }
 
-    public addFrames(frames: (ICanvasFrameData | IImageFrameData) []) {
+    public addFrames(frames: (ICanvasFrameData | IImageFrameData)[]) {
         frames.forEach(f => this.addFrame(f));
     }
 
@@ -114,7 +121,6 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
      * @memberof GifEncoder
      */
     public async encode() {
-        console.time('encode time');
         await this.optimizeImagePixels();
         this.parseFramePalette();
         await this.encodeFramePixels();
@@ -123,7 +129,6 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
         this.writeApplicationExtension();
         this.writeGraphicsControlExtension();
         this.addCode(CONSTANTS.endFlag);
-        console.timeEnd('encode time');
 
         return this;
     }
@@ -133,11 +138,15 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
         const view = new DataView(array);
         this.codes.forEach((v, i) => view.setUint8(i, v));
 
-        return new Blob([view], { type: 'image/gif' });
+        return new window.Blob([view], { type: 'image/gif' });
     }
 
-    public async encodeByVideo(data: { src: string | File; from: number; to: number; fps: number }) {
-
+    public async encodeByVideo(data: {
+        src: string | File;
+        from: number;
+        to: number;
+        fps: number;
+    }) {
         if (data.src instanceof File) {
             data.src = URL.createObjectURL(data.src);
         }
@@ -145,18 +154,19 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
         video.controls = true;
         video.src = data.src;
 
-        await new Promise((res, rej) => {
+        await new Promise((resolve, reject) => {
             const delay = 1000 / data.fps;
 
             const imgs: any[] = [];
             let index = data.from;
             try {
+                // eslint-disable-next-line
                 function next() {
                     if (index < Math.min(data.to, video.duration)) {
                         video.currentTime = index;
                         index += delay / 1000;
                     } else {
-                        res(imgs);
+                        resolve(imgs);
                     }
                 }
                 video.onseeked = () => {
@@ -172,9 +182,8 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
                 video.onloadeddata = () => {
                     next();
                 };
-
             } catch (error) {
-                rej(error);
+                reject(error);
             }
         });
 
@@ -194,14 +203,16 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
     }
 
     private writeLogicalScreenDescriptor() {
-        this.addCodes([this.w & 255, this.w >> 8]);  // w
-        this.addCodes([this.h & 255, this.h >> 8]);  // w
+        this.addCodes([this.w & 255, this.w >> 8]); // w
+        this.addCodes([this.h & 255, this.h >> 8]); // w
 
         const globalPalette = this.globalPalette;
         let m = 1 << 7; // globalColorTableFlag
         m += 0 << 4; // colorResolution
         m += 0 << 3; // sortFlag
-        m += globalPalette.length ? Math.ceil(Math.log2(globalPalette.length / 3)) - 1 : 0; // sizeOfGlobalColorTable
+        m += globalPalette.length
+            ? Math.ceil(Math.log2(globalPalette.length / 3)) - 1
+            : 0; // sizeOfGlobalColorTable
 
         this.addCode(m);
         this.addCode(0); // backgroundColorIndex
@@ -226,66 +237,71 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 
     private writeGraphicsControlExtension() {
         const globalPalette = this.globalPalette;
-        this.frames.filter(data => data.w && data.h).forEach((frame) => {
-            // 1. Graphics Control Extension
-            this.addCode(CONSTANTS.extension); // exc flag
-            this.addCode(CONSTANTS.imageExtension); // al
-            this.addCode(4); // byte size
-            let m = 0;
-            let displayType = 0;
+        this.frames
+            .filter(data => data.w && data.h)
+            .forEach(frame => {
+                // 1. Graphics Control Extension
+                this.addCode(CONSTANTS.extension); // exc flag
+                this.addCode(CONSTANTS.imageExtension); // al
+                this.addCode(4); // byte size
+                let m = 0;
+                let displayType = 0;
 
-            if (frame.x || frame.y || frame.hasTransparenc) {
-                displayType = 1;
-            }
+                if (frame.x || frame.y || frame.hasTransparenc) {
+                    displayType = 1;
+                }
 
-            m += displayType << 2;
-            m += 1 << 1; // sortFlag
-            m += frame.hasTransparenc ? 1 : 0;
+                m += displayType << 2;
+                m += 1 << 1; // sortFlag
+                m += frame.hasTransparenc ? 1 : 0;
 
-            this.addCode(m);
-            const delay = Math.floor(frame.delay / 10);
-            this.addCodes([delay & 255, delay >> 8]);
-            this.addCode(frame.transparentColorIndex || 0);
-            this.addCode(0);
+                this.addCode(m);
+                const delay = Math.floor(frame.delay / 10);
+                this.addCodes([delay & 255, delay >> 8]);
+                this.addCode(frame.transparentColorIndex || 0);
+                this.addCode(0);
 
-            // 2. image Descriptor
-            this.addCode(CONSTANTS.imageDescriptor);
-            this.addCodes([frame.x & 255, frame.x >> 8]); // add x, y, w, h
-            this.addCodes([frame.y & 255, frame.y >> 8]); // add x, y, w, h
-            this.addCodes([frame.w & 255, frame.w >> 8]); // add x, y, w, h
-            this.addCodes([frame.h & 255, frame.h >> 8]); // add x, y, w, h
+                // 2. image Descriptor
+                this.addCode(CONSTANTS.imageDescriptor);
+                this.addCodes([frame.x & 255, frame.x >> 8]); // add x, y, w, h
+                this.addCodes([frame.y & 255, frame.y >> 8]); // add x, y, w, h
+                this.addCodes([frame.w & 255, frame.w >> 8]); // add x, y, w, h
+                this.addCodes([frame.h & 255, frame.h >> 8]); // add x, y, w, h
 
-            m = 0;
-            const isGlobalPalette = frame.isGlobalPalette;
-            const palette = isGlobalPalette ? globalPalette : frame.palette;
-            const sizeOfColorTable = Math.ceil(Math.log2(palette.length / 3)) - 1;
-            const colorDepth = sizeOfColorTable + 1;
-            if (!isGlobalPalette) {
-                m = (1 << 7) | sizeOfColorTable;
-            }
-            this.addCode(m);
-            if (!isGlobalPalette) {
-                this.addCodes(palette);
-            }
+                m = 0;
+                const isGlobalPalette = frame.isGlobalPalette;
+                const palette = isGlobalPalette ? globalPalette : frame.palette;
+                const sizeOfColorTable =
+                    Math.ceil(Math.log2(palette.length / 3)) - 1;
+                const colorDepth = sizeOfColorTable + 1;
+                if (!isGlobalPalette) {
+                    m = (1 << 7) | sizeOfColorTable;
+                }
+                this.addCode(m);
+                if (!isGlobalPalette) {
+                    this.addCodes(palette);
+                }
 
-            // image data
-            this.addCode(colorDepth);
-            const c = [...frame.pixels];
-            let len = c.length;
+                // image data
+                this.addCode(colorDepth);
+                const c = [...frame.pixels];
+                let len = c.length;
 
-            while (len > 0) {
-                this.addCode(Math.min(len, 255));
-                this.addCodes(c.splice(0, 255));
-                len -= 255;
-            }
-            this.addCode(0);
-        });
+                while (len > 0) {
+                    this.addCode(Math.min(len, 255));
+                    this.addCodes(c.splice(0, 255));
+                    len -= 255;
+                }
+                this.addCode(0);
+            });
     }
 
-    private toImageData(frame: ICanvasFrameData | IImageFrameData): IPixelsFrameData {
+    private toImageData(
+        frame: ICanvasFrameData | IImageFrameData,
+    ): IPixelsFrameData {
         const canvas = document.createElement('canvas');
         canvas.width = this.w;
-        canvas.height =  this.h;
+        canvas.height = this.h;
         const ctx = canvas.getContext('2d')!;
         ctx.drawImage(frame.img, 0, 0, this.w, this.h);
 
@@ -293,22 +309,35 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
             w: canvas.width,
             h: canvas.height,
             delay: frame.delay,
-            pixels: [...ctx.getImageData(0, 0, this.w, this.h).data]
+            pixels: [...ctx.getImageData(0, 0, this.w, this.h).data],
         };
     }
 
-    private async optimizeImagePixels() { // tslint:disable-line
-        const datas = await workPool.executeWork('optimizePixels', [this.frames, this.w, 30]);
-        this.frames.forEach((frame, index) => { // tslint:disable-line
+    private async optimizeImagePixels() {
+        // tslint:disable-line
+        const datas = await workPool.executeWork('optimizePixels', [
+            this.frames,
+            this.w,
+            this.colorDiff,
+        ]);
+        this.frames.forEach((frame, index) => {
+            // tslint:disable-line
             let isZip = false;
 
-            const { paletteMap, transparencCount, x, y, w, h, newPixels } = datas[index];
+            const {
+                paletteMap,
+                transparencCount,
+                x,
+                y,
+                w,
+                h,
+                newPixels,
+            } = datas[index];
             let palette = datas[index].palette;
             if (paletteMap.size > 256) {
-                console.log('NeuQuant');
                 const nq = new NeuQuant(palette, {
                     netsize: transparencCount > 0 ? 255 : 256,
-                    samplefac: 1
+                    samplefac: 1,
                 });
                 isZip = true;
                 nq.buildColorMap();
@@ -331,11 +360,15 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
             if (!frame) return current;
             if (current.isZip) return frame;
             const colorDepth1 = Math.floor(Math.log2(frame.palette.length / 3));
-            const colorDepth2 = Math.floor(Math.log2(current.palette.length / 3));
+            const colorDepth2 = Math.floor(
+                Math.log2(current.palette.length / 3),
+            );
             if (colorDepth1 < colorDepth2) {
                 return current;
             } else if (colorDepth1 === colorDepth2) {
-                return frame.palette.length > current.palette.length ? current : frame;
+                return frame.palette.length > current.palette.length
+                    ? current
+                    : frame;
             }
 
             return frame;
@@ -351,7 +384,7 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
 
         this.frames.forEach(frame => {
             if (frame === globalFrame) return;
-            const palette =   frame.palette;
+            const palette = frame.palette;
 
             const firstPaletteCopy = firstPalette.slice();
             const diffPallette: number[] = [];
@@ -369,9 +402,10 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
                 if (!hasSome) diffPallette.push(...palette.slice(x, x + 3));
             }
 
-
-            const isLocalPalette = (firstPalette.length + diffPallette.length) / 3 +
-            ((!!frame.hasTransparenc && !hasTransparenc) ? 1 : 0) > 1 << Math.ceil(Math.log2(firstPalette.length / 3));
+            const isLocalPalette =
+                (firstPalette.length + diffPallette.length) / 3 +
+                    (!!frame.hasTransparenc && !hasTransparenc ? 1 : 0) >
+                1 << Math.ceil(Math.log2(firstPalette.length / 3));
 
             if (frame.hasTransparenc) {
                 // 添加透明色位置
@@ -420,67 +454,74 @@ const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
     private async encodeFramePixels() {
         const globalPalette = this.globalPalette;
 
-        return Promise.all(this.frames.map(async (imgData) => {
-            const isZip = imgData.isZip;
-            const transparentColorIndex = imgData.transparentColorIndex;
-            const isGlobalPalette = imgData.isGlobalPalette;
-            const pixels = imgData.pixels;
+        return Promise.all(
+            this.frames.map(async imgData => {
+                const isZip = imgData.isZip;
+                const transparentColorIndex = imgData.transparentColorIndex;
+                const isGlobalPalette = imgData.isGlobalPalette;
+                const pixels = imgData.pixels;
 
-            const indexs: number[] = [];
-            const palette = isGlobalPalette ? globalPalette : imgData.palette;
-            for (let i = 0; i < pixels.length; i += 4) {
-                if (pixels[i + 3] === 0) {
-                    indexs.push(transparentColorIndex!);
-                } else {
-                    const r = pixels[i];
-                    const g = pixels[i + 1];
-                    const b = pixels[i + 2];
-
-                    if (isZip) { // from: https://github.com/unindented/neuquant-js/blob/master/src/helpers.js
-                        let minpos = 0;
-                        let mind = 256 * 256 * 256;
-                        for (let i = 0; i < palette.length; i += 3) {
-                            const dr = r - palette[i];
-                            const dg = g - palette[i + 1];
-                            const db = b - palette[i + 2];
-                            const d = dr * dr + dg * dg + db * db;
-                            const pos = (i / 3) | 0;
-
-                            if (d < mind) {
-                                mind = d;
-                                minpos = pos;
-                            }
-
-                            i += 1;
-                        }
-                        indexs.push(minpos);
+                const indexs: number[] = [];
+                const palette = isGlobalPalette
+                    ? globalPalette
+                    : imgData.palette;
+                for (let i = 0; i < pixels.length; i += 4) {
+                    if (pixels[i + 3] === 0) {
+                        indexs.push(transparentColorIndex!);
                     } else {
-                        for (let i = 0; i < palette.length; i += 3) {
-                            if (palette[i] === r && palette[i + 1] === g && palette[i + 2] === b) {
-                                indexs.push(i / 3);
-                                break;
+                        const r = pixels[i];
+                        const g = pixels[i + 1];
+                        const b = pixels[i + 2];
+
+                        if (isZip) {
+                            // from: https://github.com/unindented/neuquant-js/blob/master/src/helpers.js
+                            let minpos = 0;
+                            let mind = 256 * 256 * 256;
+                            for (let i = 0; i < palette.length; i += 3) {
+                                const dr = r - palette[i];
+                                const dg = g - palette[i + 1];
+                                const db = b - palette[i + 2];
+                                const d = dr * dr + dg * dg + db * db;
+                                const pos = (i / 3) | 0;
+
+                                if (d < mind) {
+                                    mind = d;
+                                    minpos = pos;
+                                }
+
+                                i += 1;
+                            }
+                            indexs.push(minpos);
+                        } else {
+                            for (let i = 0; i < palette.length; i += 3) {
+                                if (
+                                    palette[i] === r &&
+                                    palette[i + 1] === g &&
+                                    palette[i + 2] === b
+                                ) {
+                                    indexs.push(i / 3);
+                                    break;
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            const arr = Uint8Array.from(indexs);
-            const codes = await workPool.executeWork('encode', [
-                imgData.w,
-                imgData.h,
-                Math.log2(palette.length / 3),
-                arr],
-                [arr.buffer]
-            );
+                const arr = Uint8Array.from(indexs);
+                const codes = await workPool.executeWork(
+                    'encode',
+                    [imgData.w, imgData.h, Math.log2(palette.length / 3), arr],
+                    [arr.buffer],
+                );
 
-            imgData.pixels = codes;
+                imgData.pixels = codes;
 
-            return imgData;
-        }));
+                return imgData;
+            }),
+        );
     }
 
     private strTocode(str: string) {
         return str.split('').map(s => s.charCodeAt(0));
     }
- }
+}

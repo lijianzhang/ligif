@@ -2,21 +2,26 @@
  * @Author: lijianzhang
  * @Date: 2018-09-21 00:28:46
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 11:38:45
+ * @Last Modified time: 2019-04-14 21:04:03
  */
 
 class WorkPool {
-
     public workScripts: Map<string, Blob> = new Map();
 
     public pools: { work: Worker; isUse: boolean; name: string }[] = [];
 
-    public queue: {name: string; args: any[]; res: Function; rej: Function; transferable?: any[]}[] = [];
+    public queue: {
+        name: string;
+        args: any[];
+        res: Function;
+        rej: Function;
+        transferable?: any[];
+    }[] = [];
     private maxNum = navigator.hardwareConcurrency || 2;
 
     public registerWork(name: string, fn: Function | Blob) {
         let blob: Blob;
-        if (fn instanceof Blob) {
+        if (fn instanceof window.Blob) {
             blob = fn;
         } else {
             const str = `
@@ -26,7 +31,7 @@ class WorkPool {
                     postMessage(v);
                 }
             `;
-            blob = new Blob([str], { type: 'application/javascript' });
+            blob = new window.Blob([str], { type: 'application/javascript' });
             this.workScripts.set(name, blob);
         }
     }
@@ -34,7 +39,13 @@ class WorkPool {
     /**
      *
      */
-    public executeWork(name: string, args: any[], transferable?: any[], res?: Function, rej?: Function) {
+    public executeWork(
+        name: string,
+        args: any[],
+        transferable?: any[],
+        res?: Function,
+        rej?: Function,
+    ) {
         if (this.pools.length < this.maxNum) {
             const blob = this.workScripts.get(name);
             if (!blob) throw new Error('无效的name');
@@ -49,8 +60,14 @@ class WorkPool {
             if (pool) {
                 pool.isUse = true;
 
-                return this.completeHandle(pool.work, args, transferable, res, rej);
-            }  else {
+                return this.completeHandle(
+                    pool.work,
+                    args,
+                    transferable,
+                    res,
+                    rej,
+                );
+            } else {
                 const index = this.pools.findIndex(p => !p.isUse);
                 this.pools[index].work.terminate();
                 this.pools.splice(index, 1);
@@ -58,8 +75,9 @@ class WorkPool {
                 return this.executeWork(name, args, transferable, res, rej);
             }
         } else {
-            return new Promise((res, rej) => { // tslint:disable-line
-                this.queue.push({ name, args, transferable, res, rej});
+            return new Promise((res, rej) => {
+                // tslint:disable-line
+                this.queue.push({ name, args, transferable, res, rej });
             });
         }
     }
@@ -73,14 +91,20 @@ class WorkPool {
         }
     }
 
-    private completeHandle<T>(work: Worker, args: any[], transferable?: any[], res?: Function, rej?: Function) {
+    private completeHandle<T>(
+        work: Worker,
+        args: any[],
+        transferable?: any[],
+        res?: Function,
+        rej?: Function,
+    ) {
         work.postMessage(args, transferable);
         if (res && rej) {
-            work.onmessage = (v) =>  {
+            work.onmessage = v => {
                 res(v.data);
                 this.stopWork(work);
             };
-            work.onerror = (e) => {
+            work.onerror = e => {
                 rej(e.message);
                 this.stopWork(work);
             };
@@ -88,11 +112,11 @@ class WorkPool {
             return work;
         } else {
             return new Promise<T>((res, rej) => {
-                work.onmessage = (v) =>  {
+                work.onmessage = v => {
                     res(v.data);
                     this.stopWork(work);
                 };
-                work.onerror = (e) => {
+                work.onerror = e => {
                     rej(e.message);
                     this.stopWork(work);
                 };
@@ -102,5 +126,5 @@ class WorkPool {
 }
 
 const workPool = new WorkPool();
-(window as any).workPool = workPool;
+
 export default workPool;

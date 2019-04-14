@@ -28,13 +28,13 @@
         });
     }
 
-    const imageDescriptor = 0x2C; //44
+    const imageDescriptor = 0x2c; // 44
     const extension = 0x21; // 33
-    const imageExtension = 0xF9; // 249
+    const imageExtension = 0xf9; // 249
     const plainTextExtension = 0x01; // 1
-    const applicationExtension = 0xFF; // 255
-    const commentExtension = 0xFE; // 254
-    const endFlag = 0x3B; // 59
+    const applicationExtension = 0xff; // 255
+    const commentExtension = 0xfe; // 254
+    const endFlag = 0x3b; // 59
 
     /*
      * @Author: lijianzhang
@@ -61,7 +61,7 @@
      * @Author: lijianzhang
      * @Date: 2018-09-21 00:28:46
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-09-30 11:38:45
+     * @Last Modified time: 2019-04-14 21:04:03
      */
     class WorkPool {
         constructor() {
@@ -72,7 +72,7 @@
         }
         registerWork(name, fn) {
             let blob;
-            if (fn instanceof Blob) {
+            if (fn instanceof window.Blob) {
                 blob = fn;
             }
             else {
@@ -83,7 +83,7 @@
                     postMessage(v);
                 }
             `;
-                blob = new Blob([str], { type: 'application/javascript' });
+                blob = new window.Blob([str], { type: 'application/javascript' });
                 this.workScripts.set(name, blob);
             }
         }
@@ -115,6 +115,7 @@
             }
             else {
                 return new Promise((res, rej) => {
+                    // tslint:disable-line
                     this.queue.push({ name, args, transferable, res, rej });
                 });
             }
@@ -131,11 +132,11 @@
         completeHandle(work, args, transferable, res, rej) {
             work.postMessage(args, transferable);
             if (res && rej) {
-                work.onmessage = (v) => {
+                work.onmessage = v => {
                     res(v.data);
                     this.stopWork(work);
                 };
-                work.onerror = (e) => {
+                work.onerror = e => {
                     rej(e.message);
                     this.stopWork(work);
                 };
@@ -143,11 +144,11 @@
             }
             else {
                 return new Promise((res, rej) => {
-                    work.onmessage = (v) => {
+                    work.onmessage = v => {
                         res(v.data);
                         this.stopWork(work);
                     };
-                    work.onerror = (e) => {
+                    work.onerror = e => {
                         rej(e.message);
                         this.stopWork(work);
                     };
@@ -156,18 +157,16 @@
         }
     }
     const workPool = new WorkPool();
-    window.workPool = workPool;
 
     /*
      * @Author: lijianzhang
      * @Date: 2018-09-15 19:40:17
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-10-08 16:52:28
+     * @Last Modified time: 2019-04-14 20:21:32
      */
-    workPool.registerWork('decode', (data) => {
+    workPool.registerWork('decode', data => {
         class LzwDecode {
             constructor(colorDepth) {
-                this.dict2 = new Set();
                 this.index = 0;
                 this.remainingBits = 8;
                 this.codes = [];
@@ -179,7 +178,8 @@
                 const outputs = [];
                 let code = this.clearCode;
                 let prevCode;
-                while (true) { // tslint:disable-line
+                while (true) {
+                    // tslint:disable-line
                     prevCode = code;
                     code = this.nextCode();
                     if (code === this.endCode)
@@ -202,7 +202,8 @@
                     }
                     outputs.push(...this.getCodeSeq(code));
                     // 当字典长度等于颜色数的时候, 下个code占位数增加
-                    if (this.dict.size === (1 << this.colorSize) && this.colorSize < 12) {
+                    if (this.dict.size === 1 << this.colorSize &&
+                        this.colorSize < 12) {
                         this.colorSize += 1;
                     }
                 }
@@ -223,7 +224,6 @@
             insertSeq(str) {
                 const index = this.dict.size;
                 this.dict.set(index, str);
-                this.dict2.add(`this.colorSize: ${this.colorSize} codes: ${str.join(',')} index: ${index}`);
             }
             getCodeSeq(code) {
                 return this.dict.get(code);
@@ -235,13 +235,17 @@
                 while (colorSize > 0 && this.buffers[this.index] !== undefined) {
                     const buffer = this.buffers[this.index];
                     const size = Math.min(colorSize, this.remainingBits);
-                    code = ((buffer >> (8 - this.remainingBits) & (1 << size) - 1) << (diff)) | code;
+                    code =
+                        (((buffer >> (8 - this.remainingBits)) &
+                            ((1 << size) - 1)) <<
+                            diff) |
+                            code;
                     colorSize -= this.remainingBits;
                     this.remainingBits -= size;
                     diff += size;
                     if (this.remainingBits <= 0) {
                         this.index += 1;
-                        this.remainingBits = this.remainingBits % 8 + 8;
+                        this.remainingBits = (this.remainingBits % 8) + 8;
                     }
                 }
                 this.codes.push(code);
@@ -253,7 +257,7 @@
             const codes = decode.decode(data.imgData);
             const pixels = [];
             if (!data.isInterlace) {
-                codes.forEach((k) => {
+                codes.forEach(k => {
                     pixels.push(data.palette[k * 3]);
                     pixels.push(data.palette[k * 3 + 1]);
                     pixels.push(data.palette[k * 3 + 2]);
@@ -264,7 +268,8 @@
                 const start = [0, 4, 2, 1];
                 const inc = [8, 8, 4, 2];
                 let index = 0;
-                for (let pass = 0; pass < 4; pass += 1) { // from https://juejin.im/entry/59cc6fa151882550b3549bce
+                for (let pass = 0; pass < 4; pass += 1) {
+                    // from https://juejin.im/entry/59cc6fa151882550b3549bce
                     for (let i = start[pass]; i < data.h; i += inc[pass]) {
                         for (let j = 0; j < data.w; j += 1) {
                             const idx = (i - 1) * data.w * 4 + j * 4;
@@ -272,7 +277,8 @@
                             pixels[idx] = data.palette[k * 3];
                             pixels[idx + 1] = data.palette[k * 3 + 1];
                             pixels[idx + 2] = data.palette[k * 3 + 2];
-                            pixels[idx + 3] = k === data.transparentColorIndex ? 0 : 255;
+                            pixels[idx + 3] =
+                                k === data.transparentColorIndex ? 0 : 255;
                             index += 1;
                         }
                     }
@@ -383,12 +389,13 @@
             this.offset = 0;
         }
         get backgroundColor() {
-            if (!('backgroundColorIndex' in this) || !this.globalPalette)
+            if (!('backgroundColorIndex' in this) || !this.globalPalette) {
                 return null;
+            }
             return [
                 this.globalPalette[this.backgroundColorIndex],
                 this.globalPalette[this.backgroundColorIndex + 1],
-                this.globalPalette[this.backgroundColorIndex + 2]
+                this.globalPalette[this.backgroundColorIndex + 2],
             ];
         }
         readData(data) {
@@ -396,7 +403,9 @@
                 const fieldReader = new FileReader();
                 fieldReader.readAsArrayBuffer(data);
                 fieldReader.onload = this.handleImageData.bind(this);
-                yield new Promise(res => fieldReader.onload = () => { res(); });
+                yield new Promise(res => (fieldReader.onload = () => {
+                    res();
+                }));
                 yield this.handleImageData(fieldReader.result);
                 return this;
             });
@@ -416,13 +425,11 @@
          */
         handleImageData(buffer) {
             return __awaiter(this, void 0, void 0, function* () {
-                console.time('decode time');
                 this.dataSource = new Uint8Array(buffer);
                 this.readHeader();
                 this.readLogicalScreenDescriptor();
                 this.readExtension();
                 yield Promise.all(this.frames.map(f => f.decodeToPixels()));
-                console.timeEnd('decode time');
             });
         }
         /**
@@ -434,7 +441,7 @@
          * @memberof GifDecoder
          */
         read(len = 1) {
-            return this.dataSource.slice(this.offset, this.offset += len);
+            return this.dataSource.slice(this.offset, (this.offset += len));
         }
         /**
          * read 的快捷方法 返回一个 number
@@ -444,7 +451,7 @@
          * @memberof GifDecoder
          */
         readOne() {
-            return this.dataSource.slice(this.offset, this.offset += 1)[0];
+            return this.dataSource.slice(this.offset, (this.offset += 1))[0];
         }
         /**
          * 只读一个数据, 不会移动 offset
@@ -470,7 +477,7 @@
             this.width = w;
             this.height = h;
             const m = this.readOne();
-            const globalColorTableFlag = !!(m >> 7 & 1);
+            const globalColorTableFlag = !!((m >> 7) & 1);
             const colorDepth = m & 0b0111;
             // const sortFlag = !!(1 & (m >> 3)); // 暂时不需要
             // const colorResolution = (0b111 & m >> 4); // 暂时不需要
@@ -551,7 +558,7 @@
         readGraphicsControlExtension() {
             this.readOne(); // 跳过
             const m = this.readOne();
-            const displayType = m >> 2 & 0b111;
+            const displayType = (m >> 2) & 0b111;
             // const useInput = !!(0b1 & m >> 1); // 暂时不用
             const transparentColorFlag = !!(m & 0b1);
             const delay = (this.readOne() + (this.readOne() << 8)) * 10;
@@ -559,7 +566,9 @@
             this.frameOptions = {
                 displayType,
                 delay,
-                transparentColorIndex: transparentColorFlag ? transparentColorIndex : undefined
+                transparentColorIndex: transparentColorFlag
+                    ? transparentColorIndex
+                    : undefined,
             };
             this.readOne();
         }
@@ -570,8 +579,9 @@
         }
         readApplicationExtension() {
             const len = this.readOne();
-            if (len !== 11)
+            if (len !== 11) {
                 throw new Error('解析失败: application extension is invalid data');
+            }
             const arr = this.read(len);
             this.appVersion = arr.reduce((s, c) => s + String.fromCharCode(c), '');
             this.readOne();
@@ -597,10 +607,10 @@
             frame.preFrame = this.frames[this.frames.length - 1];
             Object.assign(frame, option);
             const m = this.readOne();
-            const isLocalColor = !!(m >> 7 & 1);
-            frame.isInterlace = !!(m >> 6 & 1);
+            const isLocalColor = !!((m >> 7) & 1);
+            frame.isInterlace = !!((m >> 6) & 1);
             // frame.sort = !!(0b1 & m >> 5);
-            const colorSize = (m & 0b111);
+            const colorSize = m & 0b111;
             if (isLocalColor) {
                 const len = Math.pow(2, (colorSize + 1)) * 3;
                 frame.palette = this.readColorTable(len);
@@ -627,9 +637,10 @@
      * @Author: lijianzhang
      * @Date: 2018-09-15 19:40:17
      * @Last Modified by: lijianzhang
-     * @Last Modified time: 2018-09-30 11:44:04
+     * @Last Modified time: 2019-04-14 21:04:23
      */
     workPool.registerWork('encode', (width, height, colorDepth, codes) => {
+        // tslint:disable-line
         class LzwEncoder {
             constructor(width, height, colorDepth) {
                 this.dict = new Map();
@@ -673,8 +684,11 @@
                         this.colorSize += 1;
                     }
                     const currentCode = str[i];
-                    const key = prefixCode !== '' ? `${prefixCode},${currentCode}` : currentCode;
-                    if (this.getSeqCode(key) !== undefined && str[i + 1] !== undefined) {
+                    const key = prefixCode !== ''
+                        ? `${prefixCode},${currentCode}`
+                        : currentCode;
+                    if (this.getSeqCode(key) !== undefined &&
+                        str[i + 1] !== undefined) {
                         prefixCode = key;
                     }
                     else {
@@ -694,14 +708,15 @@
                 let data = code;
                 while (colorSize >= 0) {
                     const size = Math.min(colorSize, this.remainingBits);
-                    const c = this.buffers[this.index] | data << (8 - this.remainingBits) & 255;
+                    const c = this.buffers[this.index] |
+                        ((data << (8 - this.remainingBits)) & 255);
                     this.buffers[this.index] = c;
                     data >>= size;
                     colorSize -= this.remainingBits;
                     this.remainingBits -= size;
                     if (this.remainingBits <= 0) {
                         this.index += 1;
-                        this.remainingBits = this.remainingBits % 8 + 8;
+                        this.remainingBits = (this.remainingBits % 8) + 8;
                     }
                 }
             }
@@ -987,8 +1002,8 @@
     /*
      * @Author: lijianzhang
      * @Date: 2018-10-08 14:33:26
-     * @Last Modified by:   lijianzhang
-     * @Last Modified time: 2018-10-08 14:33:26
+     * @Last Modified by: lijianzhang
+     * @Last Modified time: 2019-04-14 20:50:47
      */
     workPool.registerWork('optimizePixels', (frames, width, maxDiff = 30) => {
         const lastPixels = [];
@@ -1020,7 +1035,7 @@
             let isDone = false;
             let endNum = 0; // 表示连续的且到最后的透明像素的数目
             let startOffset = 0;
-            let maxStartOffset = w; //左边空白像素
+            let maxStartOffset = w; // 左边空白像素
             let maxEndOffset = w; // 右边空白像素
             let transparencCount = 0;
             for (let index = 0; index < pixels.length; index += 4) {
@@ -1110,13 +1125,14 @@
                 h,
                 palette,
                 transparencCount,
-                paletteMap
+                paletteMap,
             };
         });
     });
 
     const defaultOptions = {
-        time: 0
+        time: 0,
+        colorDiff: 30,
     };
     const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
     class GifEncoder {
@@ -1147,6 +1163,7 @@
             this.w = w;
             this.h = h;
             this.time = o.time;
+            this.colorDiff = o.colorDiff;
         }
         addFrame(frame) {
             const data = this.toImageData(frame);
@@ -1165,7 +1182,6 @@
          */
         encode() {
             return __awaiter(this, void 0, void 0, function* () {
-                console.time('encode time');
                 yield this.optimizeImagePixels();
                 this.parseFramePalette();
                 yield this.encodeFramePixels();
@@ -1174,7 +1190,6 @@
                 this.writeApplicationExtension();
                 this.writeGraphicsControlExtension();
                 this.addCode(endFlag);
-                console.timeEnd('encode time');
                 return this;
             });
         }
@@ -1182,7 +1197,7 @@
             const array = new ArrayBuffer(this.codes.length);
             const view = new DataView(array);
             this.codes.forEach((v, i) => view.setUint8(i, v));
-            return new Blob([view], { type: 'image/gif' });
+            return new window.Blob([view], { type: 'image/gif' });
         }
         encodeByVideo(data) {
             return __awaiter(this, void 0, void 0, function* () {
@@ -1192,18 +1207,19 @@
                 const video = document.createElement('video');
                 video.controls = true;
                 video.src = data.src;
-                yield new Promise((res, rej) => {
+                yield new Promise((resolve, reject) => {
                     const delay = 1000 / data.fps;
                     const imgs = [];
                     let index = data.from;
                     try {
+                        // eslint-disable-next-line
                         function next() {
                             if (index < Math.min(data.to, video.duration)) {
                                 video.currentTime = index;
                                 index += delay / 1000;
                             }
                             else {
-                                res(imgs);
+                                resolve(imgs);
                             }
                         }
                         video.onseeked = () => {
@@ -1220,7 +1236,7 @@
                         };
                     }
                     catch (error) {
-                        rej(error);
+                        reject(error);
                     }
                 });
                 return this.encode();
@@ -1242,7 +1258,9 @@
             let m = 1 << 7; // globalColorTableFlag
             m += 0 << 4; // colorResolution
             m += 0 << 3; // sortFlag
-            m += globalPalette.length ? Math.ceil(Math.log2(globalPalette.length / 3)) - 1 : 0; // sizeOfGlobalColorTable
+            m += globalPalette.length
+                ? Math.ceil(Math.log2(globalPalette.length / 3)) - 1
+                : 0; // sizeOfGlobalColorTable
             this.addCode(m);
             this.addCode(0); // backgroundColorIndex
             this.addCode(255); // pixelAspectRatio
@@ -1264,7 +1282,9 @@
         }
         writeGraphicsControlExtension() {
             const globalPalette = this.globalPalette;
-            this.frames.filter(data => data.w && data.h).forEach((frame) => {
+            this.frames
+                .filter(data => data.w && data.h)
+                .forEach(frame => {
                 // 1. Graphics Control Extension
                 this.addCode(extension); // exc flag
                 this.addCode(imageExtension); // al
@@ -1322,21 +1342,26 @@
                 w: canvas.width,
                 h: canvas.height,
                 delay: frame.delay,
-                pixels: [...ctx.getImageData(0, 0, this.w, this.h).data]
+                pixels: [...ctx.getImageData(0, 0, this.w, this.h).data],
             };
         }
         optimizeImagePixels() {
             return __awaiter(this, void 0, void 0, function* () {
-                const datas = yield workPool.executeWork('optimizePixels', [this.frames, this.w, 30]);
+                // tslint:disable-line
+                const datas = yield workPool.executeWork('optimizePixels', [
+                    this.frames,
+                    this.w,
+                    this.colorDiff,
+                ]);
                 this.frames.forEach((frame, index) => {
+                    // tslint:disable-line
                     let isZip = false;
-                    const { paletteMap, transparencCount, x, y, w, h, newPixels } = datas[index];
+                    const { paletteMap, transparencCount, x, y, w, h, newPixels, } = datas[index];
                     let palette = datas[index].palette;
                     if (paletteMap.size > 256) {
-                        console.log('NeuQuant');
                         const nq = new NeuQuant(palette, {
                             netsize: transparencCount > 0 ? 255 : 256,
-                            samplefac: 1
+                            samplefac: 1,
                         });
                         isZip = true;
                         nq.buildColorMap();
@@ -1365,7 +1390,9 @@
                     return current;
                 }
                 else if (colorDepth1 === colorDepth2) {
-                    return frame.palette.length > current.palette.length ? current : frame;
+                    return frame.palette.length > current.palette.length
+                        ? current
+                        : frame;
                 }
                 return frame;
             }, null);
@@ -1395,7 +1422,8 @@
                         diffPallette.push(...palette.slice(x, x + 3));
                 }
                 const isLocalPalette = (firstPalette.length + diffPallette.length) / 3 +
-                    ((!!frame.hasTransparenc && !hasTransparenc) ? 1 : 0) > 1 << Math.ceil(Math.log2(firstPalette.length / 3));
+                    (!!frame.hasTransparenc && !hasTransparenc ? 1 : 0) >
+                    1 << Math.ceil(Math.log2(firstPalette.length / 3));
                 if (frame.hasTransparenc) {
                     // 添加透明色位置
                     if (isLocalPalette) {
@@ -1447,7 +1475,9 @@
                     const isGlobalPalette = imgData.isGlobalPalette;
                     const pixels = imgData.pixels;
                     const indexs = [];
-                    const palette = isGlobalPalette ? globalPalette : imgData.palette;
+                    const palette = isGlobalPalette
+                        ? globalPalette
+                        : imgData.palette;
                     for (let i = 0; i < pixels.length; i += 4) {
                         if (pixels[i + 3] === 0) {
                             indexs.push(transparentColorIndex);
@@ -1456,7 +1486,8 @@
                             const r = pixels[i];
                             const g = pixels[i + 1];
                             const b = pixels[i + 2];
-                            if (isZip) { // from: https://github.com/unindented/neuquant-js/blob/master/src/helpers.js
+                            if (isZip) {
+                                // from: https://github.com/unindented/neuquant-js/blob/master/src/helpers.js
                                 let minpos = 0;
                                 let mind = 256 * 256 * 256;
                                 for (let i = 0; i < palette.length; i += 3) {
@@ -1475,7 +1506,9 @@
                             }
                             else {
                                 for (let i = 0; i < palette.length; i += 3) {
-                                    if (palette[i] === r && palette[i + 1] === g && palette[i + 2] === b) {
+                                    if (palette[i] === r &&
+                                        palette[i + 1] === g &&
+                                        palette[i + 2] === b) {
                                         indexs.push(i / 3);
                                         break;
                                     }
@@ -1484,12 +1517,7 @@
                         }
                     }
                     const arr = Uint8Array.from(indexs);
-                    const codes = yield workPool.executeWork('encode', [
-                        imgData.w,
-                        imgData.h,
-                        Math.log2(palette.length / 3),
-                        arr
-                    ], [arr.buffer]);
+                    const codes = yield workPool.executeWork('encode', [imgData.w, imgData.h, Math.log2(palette.length / 3), arr], [arr.buffer]);
                     imgData.pixels = codes;
                     return imgData;
                 })));
@@ -1502,29 +1530,31 @@
 
     window.GIFEncoder = GifEncoder;
     window.GIFDecoder = GifDecoder;
-    document.getElementById('main').addEventListener('drop', test);
-    document.getElementById('main').addEventListener('dragover', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-    });
     function test(e) {
         e.stopPropagation();
         e.preventDefault();
         const field = e.dataTransfer.files[0];
         const gif = new GifDecoder();
         window.gif = gif;
+        console.time('decode time');
         gif.readData(field).then(gif => {
-            gif.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas));
-            const gIFEncoder = new GifEncoder(gif.width, gif.height);
+            console.timeEnd('decode time');
+            gif.frames.forEach(f => document
+                .querySelector('#imgs')
+                .appendChild(f.renderToCanvas().canvas));
+            const width = Math.min(400, gif.width);
+            const zoom = gif.width / width;
+            const gIFEncoder = new GifEncoder(width, gif.height / zoom);
             window.gIFEncoder = gIFEncoder;
             gIFEncoder.addFrames(gif.frames.map(f => ({ img: f.ctx.canvas, delay: f.delay })));
+            console.time('encode time');
             gIFEncoder.encode().then(() => {
+                console.timeEnd('encode time');
                 const img = document.createElement('img');
                 img.src = URL.createObjectURL(gIFEncoder.toBlob());
-                document.body.appendChild(img);
-                const b = new GifDecoder();
-                window.b = b;
-                b.readCodes(gIFEncoder.codes).then(() => b.frames.forEach(f => document.body.appendChild(f.renderToCanvas().canvas)));
+                document
+                    .querySelector('#imgs')
+                    .insertBefore(img, document.querySelector('canvas'));
             });
         });
     }
@@ -1549,5 +1579,10 @@
             document.body.appendChild(img);
         });
     };
+    document.getElementById('main').addEventListener('drop', test);
+    document.getElementById('main').addEventListener('dragover', e => {
+        e.stopPropagation();
+        e.preventDefault();
+    });
 
 })));

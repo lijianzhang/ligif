@@ -2,17 +2,17 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:57:06
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-10-08 16:51:14
+ * @Last Modified time: 2019-04-14 21:05:38
  */
 import * as CONSTANT from './constants';
 import DecodeFrame from './frame/decode-frame';
- /**
-  * gif文件解码器
-  *
-  * @export
-  * @ class GifDecoder
-  */
- export default class GifDecoder {
+/**
+ * gif文件解码器
+ *
+ * @export
+ * @ class GifDecoder
+ */
+export default class GifDecoder {
     /**
      * gif 宽度
      *
@@ -91,12 +91,13 @@ import DecodeFrame from './frame/decode-frame';
     private frameOptions?: Partial<LiGif.IDecodeFrame>;
 
     get backgroundColor(): [number, number, number] | null {
-        if (!('backgroundColorIndex' in this) || !this.globalPalette) return null;
+        if (!('backgroundColorIndex' in this) || !this.globalPalette)
+        { return null; }
 
         return [
             this.globalPalette[this.backgroundColorIndex],
             this.globalPalette[this.backgroundColorIndex + 1],
-            this.globalPalette[this.backgroundColorIndex + 2]
+            this.globalPalette[this.backgroundColorIndex + 2],
         ];
     }
 
@@ -104,7 +105,12 @@ import DecodeFrame from './frame/decode-frame';
         const fieldReader = new FileReader();
         fieldReader.readAsArrayBuffer(data);
         fieldReader.onload = this.handleImageData.bind(this);
-        await new Promise(res => fieldReader.onload = () => {res(); });
+        await new Promise(
+            res =>
+                (fieldReader.onload = () => {
+                    res();
+                }),
+        );
         await this.handleImageData(fieldReader.result as ArrayBuffer);
 
         return this;
@@ -124,13 +130,11 @@ import DecodeFrame from './frame/decode-frame';
      * @memberof GifDecoder
      */
     protected async handleImageData(buffer: ArrayBuffer | number[]) {
-        console.time('decode time');
         this.dataSource = new Uint8Array(buffer);
         this.readHeader();
         this.readLogicalScreenDescriptor();
         this.readExtension();
         await Promise.all(this.frames.map(f => f.decodeToPixels()));
-        console.timeEnd('decode time');
     }
 
     /**
@@ -142,7 +146,7 @@ import DecodeFrame from './frame/decode-frame';
      * @memberof GifDecoder
      */
     protected read(len = 1) {
-        return this.dataSource.slice(this.offset, this.offset += len);
+        return this.dataSource.slice(this.offset, (this.offset += len));
     }
 
     /**
@@ -153,7 +157,7 @@ import DecodeFrame from './frame/decode-frame';
      * @memberof GifDecoder
      */
     protected readOne() {
-        return this.dataSource.slice(this.offset, this.offset += 1)[0];
+        return this.dataSource.slice(this.offset, (this.offset += 1))[0];
     }
 
     /**
@@ -168,13 +172,19 @@ import DecodeFrame from './frame/decode-frame';
     }
 
     protected readHeader() {
-        const type = this.read(3).reduce((str, code) => str + String.fromCharCode(code), '');
+        const type = this.read(3).reduce(
+            (str, code) => str + String.fromCharCode(code),
+            '',
+        );
 
         if (type !== 'GIF') {
             throw new Error('gif签名无效');
         }
 
-        const version = this.read(3).reduce((str, code) => str + String.fromCharCode(code), '');
+        const version = this.read(3).reduce(
+            (str, code) => str + String.fromCharCode(code),
+            '',
+        );
         this.version = version;
     }
 
@@ -184,7 +194,7 @@ import DecodeFrame from './frame/decode-frame';
         this.width = w;
         this.height = h;
         const m = this.readOne();
-        const globalColorTableFlag = !!(m >> 7 & 1);
+        const globalColorTableFlag = !!((m >> 7) & 1);
 
         const colorDepth = m & 0b0111;
 
@@ -197,7 +207,7 @@ import DecodeFrame from './frame/decode-frame';
         this.readOne(); // 读取 pixelAspectRatio 暂时不需要使用
 
         if (globalColorTableFlag) {
-            const len =  2 ** (colorDepth + 1) * 3;
+            const len = 2 ** (colorDepth + 1) * 3;
             this.globalPalette = this.readColorTable(len);
             this.backgroundColorIndex = backgroundColorIndex;
         }
@@ -276,7 +286,7 @@ import DecodeFrame from './frame/decode-frame';
         this.readOne(); // 跳过
         const m = this.readOne();
 
-        const displayType = m >> 2 & 0b111;
+        const displayType = (m >> 2) & 0b111;
         // const useInput = !!(0b1 & m >> 1); // 暂时不用
         const transparentColorFlag = !!(m & 0b1);
         const delay = (this.readOne() + (this.readOne() << 8)) * 10;
@@ -285,22 +295,23 @@ import DecodeFrame from './frame/decode-frame';
         this.frameOptions = {
             displayType,
             delay,
-            transparentColorIndex: transparentColorFlag ? transparentColorIndex : undefined
+            transparentColorIndex: transparentColorFlag
+                ? transparentColorIndex
+                : undefined,
         };
         this.readOne();
     }
 
     private readCommentExtension() {
-
         const len = this.readOne();
         const arr = this.read(len + 1);
         this.commit = arr.reduce((s, c) => s + String.fromCharCode(c), '');
     }
 
     private readApplicationExtension() {
-
         const len = this.readOne();
-        if (len !== 11) throw new Error('解析失败: application extension is invalid data');
+        if (len !== 11)
+        { throw new Error('解析失败: application extension is invalid data'); }
 
         const arr = this.read(len);
         this.appVersion = arr.reduce((s, c) => s + String.fromCharCode(c), '');
@@ -314,13 +325,11 @@ import DecodeFrame from './frame/decode-frame';
     }
 
     private readPlainTextExtension() {
-
         const len = this.readOne();
         this.read(len); // TODO: 暂时不处理, 直接跳过
     }
 
     private readImageDescriptor() {
-
         const option = this.frameOptions || {};
         this.frameOptions = undefined;
 
@@ -335,12 +344,12 @@ import DecodeFrame from './frame/decode-frame';
         Object.assign(frame, option);
 
         const m = this.readOne();
-        const isLocalColor = !!(m >> 7 & 1);
-        frame.isInterlace = !!(m >> 6 & 1);
+        const isLocalColor = !!((m >> 7) & 1);
+        frame.isInterlace = !!((m >> 6) & 1);
         // frame.sort = !!(0b1 & m >> 5);
-        const colorSize = (m & 0b111);
+        const colorSize = m & 0b111;
         if (isLocalColor) {
-            const len =  2 ** (colorSize + 1) * 3;
+            const len = 2 ** (colorSize + 1) * 3;
             frame.palette = this.readColorTable(len);
         } else {
             frame.isGlobalPalette = true;
@@ -358,6 +367,5 @@ import DecodeFrame from './frame/decode-frame';
         }
         frame.imgData = data;
         if (frame.w && frame.h) this.frames.push(frame);
-
     }
- }
+}

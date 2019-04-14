@@ -1,8 +1,8 @@
 /*
  * @Author: lijianzhang
  * @Date: 2018-10-08 14:33:26
- * @Last Modified by:   lijianzhang
- * @Last Modified time: 2018-10-08 14:33:26
+ * @Last Modified by: lijianzhang
+ * @Last Modified time: 2019-04-14 20:50:47
  */
 import workPool from './work-pool';
 import EncodeFrame from './frame/encode-Frame';
@@ -18,7 +18,7 @@ workPool.registerWork(
          */
         function colourDistance(
             rgb1: [number, number, number],
-            rgb2: [number, number, number]
+            rgb2: [number, number, number],
         ) {
             const rmean = (rgb1[0] + rgb2[0]) / 2;
             const r = rgb1[0] - rgb2[0];
@@ -28,7 +28,7 @@ workPool.registerWork(
             return Math.sqrt(
                 (((rmean + 512) * r * r) >> 8) +
                     g * g * 4 +
-                    (((767 - rmean) * b * b) >> 8)
+                    (((767 - rmean) * b * b) >> 8),
             );
         }
 
@@ -49,7 +49,7 @@ workPool.registerWork(
             let isDone = false;
             let endNum = 0; // 表示连续的且到最后的透明像素的数目
             let startOffset = 0;
-            let maxStartOffset = w; //左边空白像素
+            let maxStartOffset = w; // 左边空白像素
             let maxEndOffset = w; // 右边空白像素
             let transparencCount = 0;
 
@@ -147,8 +147,8 @@ workPool.registerWork(
                 h,
                 palette,
                 transparencCount,
-                paletteMap
+                paletteMap,
             };
         });
-    }
+    },
 );
