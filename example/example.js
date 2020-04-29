@@ -1542,7 +1542,7 @@
             gif.frames.forEach(f => document
                 .querySelector('#imgs')
                 .appendChild(f.renderToCanvas().canvas));
-            const width = Math.min(400, gif.width);
+            const width = gif.width;
             const zoom = gif.width / width;
             const gIFEncoder = new GifEncoder(width, gif.height / zoom);
             window.gIFEncoder = gIFEncoder;

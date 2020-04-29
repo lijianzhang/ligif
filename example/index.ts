@@ -18,7 +18,7 @@ function test(e) {
                 .querySelector('#imgs')
                 .appendChild(f.renderToCanvas().canvas),
         );
-        const width = Math.min(400, gif.width);
+        const width = gif.width;
         const zoom = gif.width / width;
         const gIFEncoder = new GIFEncoder(width, gif.height / zoom);
         (window as any).gIFEncoder = gIFEncoder;
