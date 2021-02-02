@@ -1,6 +1,6 @@
 {
   "name": "ligif",
-  "version": "0.0.10",
+  "version": "0.1.0",
   "description": "tool library for gif",
   "main": "dist/ligif.umd.js",
   "module": "dist/ligif.es.js",
