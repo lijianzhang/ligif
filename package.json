@@ -5,9 +5,10 @@
   "main": "dist/ligif.umd.js",
   "module": "dist/ligif.es.js",
   "type": "module",
+  "types": "typings/main.d.ts",
   "scripts": {
     "dev": "EXAMPLE=true vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "prepublish": "npm run build"
   },
   "keywords": [
