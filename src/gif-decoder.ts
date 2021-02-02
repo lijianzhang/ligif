@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:57:06
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2019-04-14 21:05:38
+ * @Last Modified time: 2021-02-02 22:24:40
  */
 import * as CONSTANT from './constants';
 import DecodeFrame from './frame/decode-frame';
@@ -108,7 +108,7 @@ export default class GifDecoder {
         await new Promise(
             res =>
                 (fieldReader.onload = () => {
-                    res();
+                    res(true);
                 }),
         );
         await this.handleImageData(fieldReader.result as ArrayBuffer);

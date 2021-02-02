@@ -2,59 +2,43 @@
  * @Author: lijianzhang
  * @Date: 2018-09-21 00:28:46
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2019-04-14 21:04:03
+ * @Last Modified time: 2021-02-02 23:33:00
  */
 
+interface Args {
+    name: string;
+    [k: string]: any;
+}
+
 class WorkPool {
-    public workScripts: Map<string, Blob> = new Map();
+    public workScripts: Map<string, typeof Worker> = new Map();
 
     public pools: { work: Worker; isUse: boolean; name: string }[] = [];
 
     public queue: {
         name: string;
-        args: any[];
+        args: Args;
         res: Function;
         rej: Function;
         transferable?: any[];
     }[] = [];
     private maxNum = navigator.hardwareConcurrency || 2;
 
-    public registerWork(name: string, fn: Function | Blob) {
-        let blob: Blob;
-        if (fn instanceof window.Blob) {
-            blob = fn;
-        } else {
-            const str = `
-                var fn = ${fn};
-                onmessage=function(e, transferable){
-                    const v = fn(...e.data, transferable);
-                    postMessage(v);
-                }
-            `;
-            blob = new window.Blob([str], { type: 'application/javascript' });
-            this.workScripts.set(name, blob);
-        }
+    public registerWork(name: string, Worker: any) {
+        this.workScripts.set(name, Worker);
     }
-
     /**
      *
      */
     public executeWork(
         name: string,
-        args: any[],
+        args: Args,
         transferable?: any[],
         res?: Function,
         rej?: Function,
     ) {
-        if (this.pools.length < this.maxNum) {
-            const blob = this.workScripts.get(name);
-            if (!blob) throw new Error('无效的name');
-            const work = new Worker(URL.createObjectURL(blob));
-            this.pools.push({ name, work, isUse: true });
+        const pools = this.pools.filter(p => !p.isUse && p.name === name);
 
-            return this.completeHandle(work, args, transferable, res, rej);
-        }
-        const pools = this.pools.filter(p => !p.isUse);
         if (pools.length) {
             const pool = pools.find(p => p.name === name);
             if (pool) {
@@ -75,10 +59,18 @@ class WorkPool {
                 return this.executeWork(name, args, transferable, res, rej);
             }
         } else {
-            return new Promise((res, rej) => {
-                // tslint:disable-line
-                this.queue.push({ name, args, transferable, res, rej });
-            });
+            if (this.pools.length < this.maxNum) {
+                const Worker = this.workScripts.get(name);
+                const work = new Worker('');
+                this.pools.push({ name, work, isUse: true });
+
+                return this.completeHandle(work, args, transferable, res, rej);
+            } else {
+                return new Promise((res, rej) => {
+                    // tslint:disable-line
+                    this.queue.push({ name, args, transferable, res, rej });
+                });
+            }
         }
     }
 
@@ -93,7 +85,7 @@ class WorkPool {
 
     private completeHandle<T>(
         work: Worker,
-        args: any[],
+        args: Args,
         transferable?: any[],
         res?: Function,
         rej?: Function,

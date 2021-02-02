@@ -1,15 +1,14 @@
-import './lzw-encode'; // tslint:disable-line
-import EncodeFrame from './frame/encode-Frame';
-import NeuQuant from './neuquant';
-import workPool from './work-pool';
-import './optimizePixels';
-import * as CONSTANTS from './constants';
 /*
  * @Author: lijianzhang
  * @Date: 2018-09-30 09:35:57
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2019-04-14 21:06:25
+ * @Last Modified time: 2021-02-02 23:52:08
  */
+import EncodeFrame from './frame/encode-Frame';
+import NeuQuant from './neuquant';
+import workPool from './work-pool';
+import * as CONSTANTS from './constants';
+
 export interface IDefalutFrameData {
     pixels: number[];
     delay?: number;
@@ -34,10 +33,11 @@ export interface IPixelsFrameData {
 
 const defaultOptions = {
     time: 0,
-    colorDiff: 30,
+    colorDiff: 1,
 };
 
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
+
 
 export default class GifEncoder {
     /**
@@ -315,11 +315,12 @@ export default class GifEncoder {
 
     private async optimizeImagePixels() {
         // tslint:disable-line
-        const datas = await workPool.executeWork('optimizePixels', [
-            this.frames,
-            this.w,
-            this.colorDiff,
-        ]);
+        const datas = await workPool.executeWork('gif', {
+            name: 'optimizePixels',
+            frames: this.frames,
+            width: this.w,
+            maxDiff: this.colorDiff,
+        });
         this.frames.forEach((frame, index) => {
             // tslint:disable-line
             let isZip = false;
@@ -509,9 +510,14 @@ export default class GifEncoder {
 
                 const arr = Uint8Array.from(indexs);
                 const codes = await workPool.executeWork(
-                    'encode',
-                    [imgData.w, imgData.h, Math.log2(palette.length / 3), arr],
-                    [arr.buffer],
+                    'gif',
+                    {
+                        name: 'encode',
+                        width: imgData.w,
+                        height: imgData.h,
+                        colorDepth: Math.log2(palette.length / 3),
+                        codes: arr,
+                    }
                 );
 
                 imgData.pixels = codes;

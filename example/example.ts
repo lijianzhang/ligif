@@ -1,4 +1,4 @@
-import { GIFDecoder, GIFEncoder } from '../src';
+import { GIFDecoder, GIFEncoder } from '../src/main';
 
 (window as any).GIFEncoder = GIFEncoder;
 (window as any).GIFDecoder = GIFDecoder;
@@ -20,7 +20,7 @@ function test(e) {
         );
         const width = gif.width;
         const zoom = gif.width / width;
-        const gIFEncoder = new GIFEncoder(width, gif.height / zoom);
+        const gIFEncoder = new GIFEncoder(width, gif.height / zoom, { colorDiff: 1 });
         (window as any).gIFEncoder = gIFEncoder;
         gIFEncoder.addFrames(
             gif.frames.map(f => ({ img: f.ctx!.canvas, delay: f.delay })),
@@ -41,7 +41,7 @@ const img1 = document.getElementById('img1') as HTMLImageElement;
 const img2 = document.getElementById('img2') as HTMLImageElement;
 const img3 = document.getElementById('img3') as HTMLImageElement;
 
-const encoder = new GIFEncoder(img1.width, img1.height, { time: 10 });
+const encoder = new GIFEncoder(img1.width, img1.height, { time: 10, colorDiff: 10 });
 encoder.addFrame({ img: img1, delay: 1000 });
 encoder.addFrame({ img: img2, delay: 1000 });
 encoder.addFrame({ img: img3, delay: 1000 });
@@ -55,11 +55,14 @@ encoder.encode().then(() => {
 const field = document.getElementById('file') as HTMLInputElement;
 field.onchange = () => {
     const a = new GIFEncoder(320, 180);
-    a.encodeByVideo({ src: field.files[0], from: 3, to: 6, fps: 5 }).then(
+    console.time('video time');
+
+    a.encodeByVideo({ src: field.files[0], from: 3, to: 40, fps: 5 }).then(
         () => {
             const img = document.createElement('img');
             img.src = URL.createObjectURL(a.toBlob());
             document.body.appendChild(img);
+            console.timeEnd('video time');
         },
     );
 };

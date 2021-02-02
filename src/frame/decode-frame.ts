@@ -2,12 +2,14 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:53:35
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-10-08 17:04:28
+ * @Last Modified time: 2021-02-02 23:28:10
  */
 
 import BaseFrame from './base-frame';
-import '../lzw-decode';
 import workPool from '../work-pool';
+
+
+
 
 export interface DecodeFrameDelegate {
     width: number;
@@ -27,13 +29,16 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
     public delegate: DecodeFrameDelegate;
 
     public async decodeToPixels() {
-        const pixels = await workPool.executeWork('decode', [{ imgData: this.imgData,
+        const pixels = await workPool.executeWork('gif', {
+            name: 'decodeToPixels',
+            imgData: this.imgData,
             colorDepth: this.colorDepth,
             palette: this.palette,
             h: this.h,
             w: this.w,
             transparentColorIndex: this.transparentColorIndex,
-            isInterlace: this.isInterlace }]);
+            isInterlace: this.isInterlace
+        });
         this.pixels = pixels;
     }
 

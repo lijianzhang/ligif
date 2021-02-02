@@ -2,16 +2,12 @@
   "name": "ligif",
   "version": "0.0.10",
   "description": "tool library for gif",
-  "main": "lib/index.js",
-  "module": "es/index.js",
+  "main": "dist/ligif.umd.js",
+  "module": "dist/ligif.es.js",
+  "type": "module",
   "scripts": {
-    "build:commonjs": "tsc -m commonjs --outdir lib",
-    "build:es": "tsc",
-    "start": "rollup -c rollup.config.dev.js -w",
-    "build:umd": "NODE_ENV=development rollup -c -o dist/ligif.js",
-    "build:umd:min": "NODE_ENV=production rollup -c -o dist/ligif.min.js",
-    "build": "npm run clear && npm run build:commonjs && npm run build:es && npm run build:umd && npm run build:umd:min",
-    "clear": "rm -rf dist & rm -rf es & rm -rf lib",
+    "dev": "EXAMPLE=true vite",
+    "build": "vite build",
     "prepublish": "npm run build"
   },
   "keywords": [
@@ -24,11 +20,7 @@
   "devDependencies": {
     "@gaoding/eslint-config-typescript": "^1.1.1",
     "eslint": "^5.16.0",
-    "rollup": "^0.66.2",
-    "rollup-plugin-commonjs": "^9.0.0",
-    "rollup-plugin-serve": "^0.6.0",
-    "rollup-plugin-typescript2": "^0.17.0",
-    "rollup-plugin-uglify": "^3.0.0",
-    "typescript": "^3.1.1"
+    "typescript": "^4.1.1",
+    "vite": "^2.0.0-beta.61"
   }
 }

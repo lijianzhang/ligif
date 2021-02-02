@@ -1,22 +1,17 @@
 
 {
   "compilerOptions": {
-    "module": "es6",
-    "moduleResolution": "node",
-    "newLine": "LF",
-    "outDir": "./es",
-    "target": "es6",
-    "sourceMap": false,
-    "lib": ["dom", "esnext"],
-    "noUnusedLocals": true,
+    "target": "esnext",
+    "module": "esnext",
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "declarationDir": "typings",
     "declaration": true,
-    "noUnusedParameters": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "noImplicitAny": false,
-    "noImplicitReturns": true,
-    "allowSyntheticDefaultImports": true,
-    "noFallthroughCasesInSwitch": true
+    "moduleResolution": "node",
+    "strict": false,
+    "jsx": "preserve",
+    "sourceMap": true,
+    "lib": ["dom", "esnext", "WebWorker"],
   },
   "include": [
     "src/**/*"

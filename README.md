@@ -6,7 +6,7 @@
 * 文件格式: [3MF Project: What’s In A GIF - Bit by Byte](http://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp)
 
 ### Demo
-[example](https://lijianzhang.github.io/ligif/example/index.html)
+[example](https://lijianzhang.github.io/ligif)
 
 ### Installation
 
@@ -22,9 +22,9 @@ npm i -S ligif
 
 ### Usage
 
-**生成gif**
+**生成GIF**
 
-```javas
+```javascript
 import { GIFEncoder } from 'ligif';
 const img1 = document.getElementById('img1');
 const img2 = document.getElementById('img2');
@@ -45,9 +45,9 @@ encoder.encode().then(() => {
 
 
 
-**解析gif**
+**解析GIF**
 
-```javas
+```javascript
 import { GIFDecoder } from 'ligif';
 
 document.getElementById('main').addEventListener('drop', function (e) {
@@ -66,13 +66,10 @@ document.getElementById('main').addEventListener('drop', function (e) {
 
 ### TODO
 
-- [ ] 增加进度回调
-- [ ] 卡线程操作都改为worker(会导致耗时增加,先不做)
-- [x] 支持video转gif
+- [x] 支持video转GIF
 - [x] 支持控制循环次数
-- [ ] 支持有损压缩
-- [ ] 进一步优化无损压缩体积
-
+- [x] 支持有损压缩
+- [ ] 对比wasm性能差异
 ### License
 
 [MIT](http://opensource.org/licenses/MIT)
