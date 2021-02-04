@@ -85,7 +85,7 @@ declare namespace LiGif {
          * @type {number[]}
          * @memberof IFrame
          */
-        pixels: number[];
+        pixels: Uint8Array;
 
         /**
          * 显示延时时间 单位: ms(10的倍数 比如 147 会转成 140)

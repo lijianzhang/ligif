@@ -2,11 +2,13 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:53:35
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2021-02-02 23:28:10
+ * @Last Modified time: 2021-02-06 23:59:08
  */
 
 import BaseFrame from './base-frame';
 import workPool from '../work-pool';
+import { Go } from '../go';
+
 
 
 
@@ -16,7 +18,6 @@ export interface DecodeFrameDelegate {
     height: number;
     backgroundColor: [number, number, number] | null;
 }
-
 export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame {
     public preFrame?: DecodeFrame;
 
@@ -29,7 +30,7 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
     public delegate: DecodeFrameDelegate;
 
     public async decodeToPixels() {
-        const pixels = await workPool.executeWork('gif', {
+        this.pixels = await workPool.executeWork('gif', {
             name: 'decodeToPixels',
             imgData: this.imgData,
             colorDepth: this.colorDepth,
@@ -39,7 +40,6 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
             transparentColorIndex: this.transparentColorIndex,
             isInterlace: this.isInterlace
         });
-        this.pixels = pixels;
     }
 
     /**
@@ -58,45 +58,25 @@ export default class DecodeFrame extends BaseFrame implements LiGif.IDecodeFrame
         canvas.width = this.delegate.width;
         canvas.height = this.delegate.height;
 
-        let imgData = this.ctx.getImageData(0, 0, this.w, this.h);
-
-        this.pixels!.forEach((v, i) => (imgData.data[i] = v));
-        this.ctx.putImageData(imgData, this.x, this.y, 0, 0, this.w, this.h);
-
-        if (!this.preFrame && this.delegate.backgroundColor) {
-            imgData = this.ctx.getImageData(0, 0, this.delegate.width, this.delegate.height);
-            for (let i = 0; i < imgData.data.length; i += 4) {
-                if (imgData.data[i + 3] === 0) {
-                    imgData.data[i] = this.delegate.backgroundColor[0];
-                    imgData.data[i + 1] = this.delegate.backgroundColor[1];
-                    imgData.data[i + 2] = this.delegate.backgroundColor[2];
-                    imgData.data[i + 3] = 255;
-                }
-            }
-        } else if (
-            (this.displayType === 1 || this.displayType === 2) &&
-            this.preFrame
-        ) {
+        if (this.preFrame) {
             if (!this.preFrame.ctx) this.preFrame.renderToCanvas(retry);
-            imgData = this.ctx.getImageData(0, 0, this.delegate.width, this.delegate.height);
-            const prevImageData = this.preFrame.ctx!.getImageData(
-                0,
-                0,
-                this.delegate.width,
-                this.delegate.height
-            );
-            for (let i = 0; i < imgData.data.length; i += 4) {
-                if (imgData.data[i + 3] === 0) {
-                    imgData.data[i] = prevImageData.data[i];
-                    imgData.data[i + 1] = prevImageData.data[i + 1];
-                    imgData.data[i + 2] = prevImageData.data[i + 2];
-                    imgData.data[i + 3] = prevImageData.data[i + 3];
-                }
-            }
-            this.ctx.putImageData(imgData, 0, 0);
+            const imgData = this.preFrame.ctx.getImageData(0, 0, this.delegate.width, this.delegate.height);
+            this.ctx.putImageData(imgData, 0, 0)
         }
 
+        let imgData = this.ctx.getImageData(this.x, this.y, this.w, this.h);
+
+        for (let i = 0; i < imgData.data.length; i += 4) {
+            if (this.pixels[i + 3] === 0) continue
+
+            imgData.data[i] = this.pixels[i]
+            imgData.data[i + 1] = this.pixels[i + 1]
+            imgData.data[i + 2] = this.pixels[i + 2]
+            imgData.data[i + 3] = this.pixels[i + 3]
+        }
+
+        this.ctx.putImageData(imgData, this.x, this.y)
+
         return this.ctx;
-        // TODO: When displayType is equal to 3 or 4
     }
 }

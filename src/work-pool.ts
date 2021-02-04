@@ -2,16 +2,15 @@
  * @Author: lijianzhang
  * @Date: 2018-09-21 00:28:46
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2021-02-02 23:33:00
+ * @Last Modified time: 2021-02-06 23:56:02
  */
 
 interface Args {
-    name: string;
     [k: string]: any;
 }
 
 class WorkPool {
-    public workScripts: Map<string, typeof Worker> = new Map();
+    public workScripts: Map<string, () => Worker> = new Map();
 
     public pools: { work: Worker; isUse: boolean; name: string }[] = [];
 
@@ -24,8 +23,8 @@ class WorkPool {
     }[] = [];
     private maxNum = navigator.hardwareConcurrency || 2;
 
-    public registerWork(name: string, Worker: any) {
-        this.workScripts.set(name, Worker);
+    public registerWork(name: string, createWorker: () => Worker) {
+        this.workScripts.set(name, createWorker);
     }
     /**
      *
@@ -38,7 +37,6 @@ class WorkPool {
         rej?: Function,
     ) {
         const pools = this.pools.filter(p => !p.isUse && p.name === name);
-
         if (pools.length) {
             const pool = pools.find(p => p.name === name);
             if (pool) {
@@ -60,14 +58,13 @@ class WorkPool {
             }
         } else {
             if (this.pools.length < this.maxNum) {
-                const Worker = this.workScripts.get(name);
-                const work = new Worker('');
+                const createWorker = this.workScripts.get(name);
+                const work = createWorker();
                 this.pools.push({ name, work, isUse: true });
 
                 return this.completeHandle(work, args, transferable, res, rej);
             } else {
                 return new Promise((res, rej) => {
-                    // tslint:disable-line
                     this.queue.push({ name, args, transferable, res, rej });
                 });
             }
@@ -78,7 +75,7 @@ class WorkPool {
         const pool = this.pools.find(p => p.work === work);
         if (pool) pool.isUse = false;
         if (this.queue.length) {
-            const { name, args, res, rej, transferable } = this.queue.shift()!;
+            const { name, args, res, rej, transferable } = this.queue.shift();
             this.executeWork(name, args, transferable, res, rej);
         }
     }

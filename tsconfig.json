@@ -4,7 +4,6 @@
     "target": "esnext",
     "module": "esnext",
     "emitDeclarationOnly": true,
-    "noEmit": false,
     "declarationDir": "typings",
     "declaration": true,
     "skipLibCheck": true,
@@ -12,6 +11,8 @@
     "strict": false,
     "jsx": "preserve",
     "sourceMap": true,
+    "types": ["vite/client"],
+    "plugins": [{ "name": "@vuedx/typescript-plugin-vue" }],
     "lib": ["dom", "esnext", "WebWorker"],
   },
   "include": [

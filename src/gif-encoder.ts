@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 09:35:57
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2021-02-02 23:52:08
+ * @Last Modified time: 2021-02-06 22:00:32
  */
 import EncodeFrame from './frame/encode-Frame';
 import NeuQuant from './neuquant';
@@ -27,13 +27,13 @@ export interface IImageFrameData {
 export interface IPixelsFrameData {
     w: number;
     h: number;
-    pixels: number[];
+    pixels: Uint8Array;
     delay?: number;
 }
 
 const defaultOptions = {
     time: 0,
-    colorDiff: 1,
+    colorDiff: 30,
 };
 
 const NETSCAPE2_0 = 'NETSCAPE2.0'.split('').map(s => s.charCodeAt(0));
@@ -304,29 +304,29 @@ export default class GifEncoder {
         canvas.height = this.h;
         const ctx = canvas.getContext('2d')!;
         ctx.drawImage(frame.img, 0, 0, this.w, this.h);
-
         return {
             w: canvas.width,
             h: canvas.height,
             delay: frame.delay,
-            pixels: [...ctx.getImageData(0, 0, this.w, this.h).data],
+            pixels: new Uint8Array([...ctx.getImageData(0, 0, this.w, this.h).data]),
         };
     }
 
     private async optimizeImagePixels() {
-        // tslint:disable-line
         const datas = await workPool.executeWork('gif', {
             name: 'optimizePixels',
             frames: this.frames,
             width: this.w,
             maxDiff: this.colorDiff,
         });
+
+
         this.frames.forEach((frame, index) => {
             // tslint:disable-line
             let isZip = false;
 
             const {
-                paletteMap,
+                colorLength,
                 transparencCount,
                 x,
                 y,
@@ -335,7 +335,7 @@ export default class GifEncoder {
                 newPixels,
             } = datas[index];
             let palette = datas[index].palette;
-            if (paletteMap.size > 256) {
+            if (colorLength > 256) {
                 const nq = new NeuQuant(palette, {
                     netsize: transparencCount > 0 ? 255 : 256,
                     samplefac: 1,
@@ -351,7 +351,7 @@ export default class GifEncoder {
             frame.h = h;
             frame.isZip = isZip;
             frame.hasTransparenc = transparencCount > 0;
-            frame.palette = palette;
+            frame.palette = Array.from(palette);
             frame.pixels = newPixels;
         });
     }
@@ -456,7 +456,7 @@ export default class GifEncoder {
         const globalPalette = this.globalPalette;
 
         return Promise.all(
-            this.frames.map(async imgData => {
+            this.frames.map(async (imgData,i) => {
                 const isZip = imgData.isZip;
                 const transparentColorIndex = imgData.transparentColorIndex;
                 const isGlobalPalette = imgData.isGlobalPalette;
@@ -509,16 +509,11 @@ export default class GifEncoder {
                 }
 
                 const arr = Uint8Array.from(indexs);
-                const codes = await workPool.executeWork(
-                    'gif',
-                    {
-                        name: 'encode',
-                        width: imgData.w,
-                        height: imgData.h,
-                        colorDepth: Math.log2(palette.length / 3),
-                        codes: arr,
-                    }
-                );
+                const codes = await workPool.executeWork('gif', {
+                    name: 'encode',
+                    codes: arr,
+                    colorDepth: Math.log2(palette.length / 3),
+                });
 
                 imgData.pixels = codes;
 

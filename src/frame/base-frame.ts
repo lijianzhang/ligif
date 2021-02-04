@@ -2,7 +2,7 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:53:33
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2018-09-30 02:55:36
+ * @Last Modified time: 2021-02-06 18:27:27
  */
 export default class BaseFrame implements LiGif.IFrame {
     constructor(w: number, h: number, x: number = 0, y: number = 0) {
@@ -24,7 +24,7 @@ export default class BaseFrame implements LiGif.IFrame {
 
     public palette = [];
 
-    public pixels = [];
+    public pixels: Uint8Array = new Uint8Array();
 
     public isGlobalPalette = false;
 

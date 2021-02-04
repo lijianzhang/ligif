@@ -2,10 +2,11 @@
  * @Author: lijianzhang
  * @Date: 2018-09-30 02:57:06
  * @Last Modified by: lijianzhang
- * @Last Modified time: 2021-02-02 22:24:40
+ * @Last Modified time: 2021-02-06 20:27:07
  */
 import * as CONSTANT from './constants';
 import DecodeFrame from './frame/decode-frame';
+
 /**
  * gif文件解码器
  *
@@ -131,10 +132,23 @@ export default class GifDecoder {
      */
     protected async handleImageData(buffer: ArrayBuffer | number[]) {
         this.dataSource = new Uint8Array(buffer);
+        // const res: any = window.decodeGif(this.dataSource)
+
+        // this.width = res.width
+        // this.height = res.height
+        // res.imgs.forEach((item, i) => {
+        //     const frame = new DecodeFrame(item.w, item.h, item.x, item.y);
+        //     frame.delegate = this;
+        //     frame.pixels = item.codes;
+        //     frame.delay = res.delay[i];
+        //     this.frames.push(frame);
+
+        // })
         this.readHeader();
         this.readLogicalScreenDescriptor();
         this.readExtension();
         await Promise.all(this.frames.map(f => f.decodeToPixels()));
+
     }
 
     /**
